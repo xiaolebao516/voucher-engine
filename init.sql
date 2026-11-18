@@ -1,0 +1,41 @@
+USE voucher_engine;
+
+-- 1. 优惠券活动模板表
+CREATE TABLE `tb_voucher` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `title` VARCHAR(128) NOT NULL COMMENT '券名称',
+  `stock` INT NOT NULL COMMENT '剩余库存',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1-上架 2-下架',
+  `begin_time` DATETIME NOT NULL COMMENT '抢购开始时间',
+  `end_time` DATETIME NOT NULL COMMENT '抢购结束时间',
+  `expire_seconds` INT NOT NULL DEFAULT 900 COMMENT '抢到后多少秒未核销自动退还(默认15分钟)',
+  `version` INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号(第三关压测对比用)',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='优惠券模板表';
+
+-- 2. 用户抢券订单表
+CREATE TABLE `tb_voucher_order` (
+  `id` BIGINT NOT NULL COMMENT '全局唯一订单ID(雪花算法/Redis生成，不用自增)',
+  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `voucher_id` BIGINT NOT NULL COMMENT '优惠券ID',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态机：0-待核销 1-锁定中 2-已核销 3-已过期退还',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '抢券时间',
+  `use_time` DATETIME NULL COMMENT '核销时间',
+  `refund_time` DATETIME NULL COMMENT '过期退还时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_voucher` (`user_id`, `voucher_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='优惠券订单表';
+
+-- 3. MQ 消费幂等防重表
+CREATE TABLE `tb_mq_consume_log` (
+  `msg_id` VARCHAR(64) NOT NULL COMMENT 'MQ消息唯一ID',
+  `biz_type` VARCHAR(32) NOT NULL COMMENT '业务类型',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`msg_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MQ消费幂等记录表';
+
+-- 初始化一条测试数据：100张晚高峰5折打车神券
+INSERT INTO `tb_voucher` (`id`, `title`, `stock`, `status`, `begin_time`, `end_time`, `expire_seconds`)
+VALUES (1, '晚高峰打车5折立减神券', 100, 1, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 900);
