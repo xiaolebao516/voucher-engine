@@ -38,7 +38,6 @@ public class OrderTimeoutConsumer {
                 channel.basicAck(deliveryTag, false);
                 return;
             }
-
             // TODO 1：CAS 乐观锁尝试将订单状态从 0(待核销) 改为 3(已过期退还)
             // 提示：调用 int updated = voucherOrderMapper.timeoutOrder(orderId);
             // 如果 updated == 0，说明订单已经被核销(status=2)或已经退过款(status=3)了，
@@ -49,7 +48,7 @@ public class OrderTimeoutConsumer {
 //                channel.basicAck(deliveryTag, false);
 //                return;
 //            }
-            // 改后版本，将数据库事务操作单独卸载service里，确定提交后才执行redis操作，防止sql回滚redis没改
+            // 改后版本，将数据库事务操作单独写在service里，确定提交后才执行redis操作，防止sql回滚redis没改
             // 先改sql，落库提交，才安全的改Redis，签收mq
             boolean deRefunded = voucherOrderService.refundOrderInDb(orderId, order.getVoucherId());
             if (!deRefunded) {

@@ -24,3 +24,7 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
 #    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 打印SQL，方便你观察缓存有没有穿透打到数据库
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%-5level] [%X{traceId:-NO_TRACE}] %logger{36} - %msg%n"

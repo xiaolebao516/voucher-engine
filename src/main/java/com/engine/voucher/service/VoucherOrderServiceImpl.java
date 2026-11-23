@@ -6,9 +6,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.engine.voucher.config.RabbitMqConfig;
 import com.engine.voucher.entity.Voucher;
 import com.engine.voucher.entity.VoucherOrder;
+import com.engine.voucher.filter.TraceIdFilter;
 import com.engine.voucher.mapper.VoucherMapper;
 import com.engine.voucher.mapper.VoucherOrderMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DuplicateKeyException;
@@ -111,11 +113,25 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             String msgJson = JSONUtil.toJsonStr(msgMap);
 
             // 3. 发送到 RabbitMQ 异步下单队列
-            rabbitTemplate.convertAndSend(
-                    RabbitMqConfig.ORDER_EXCHANGE,
-                    RabbitMqConfig.ORDER_CREATE_ROUTING_KEY,
-                    msgJson
-            );
+
+            try {
+                String traceId = MDC.get(TraceIdFilter.TRACE_ID_KEY);
+                rabbitTemplate.convertAndSend(
+                        RabbitMqConfig.ORDER_EXCHANGE,
+                        RabbitMqConfig.ORDER_CREATE_ROUTING_KEY,
+                        msgJson,
+                        message -> {
+                            if (traceId != null) {
+                                message.getMessageProperties().setHeader(TraceIdFilter.TRACE_ID_KEY, traceId);
+                            }
+                            return message;
+                        }
+                );
+            }
+            catch (Exception e) {
+                // srem userid + incr voucher stock lua
+            }
+
             return "抢券成功，订单号：" + orderId;
         }
         return "系统异常";
