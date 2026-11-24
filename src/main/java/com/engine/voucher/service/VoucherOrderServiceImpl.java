@@ -10,6 +10,7 @@ import com.engine.voucher.filter.TraceIdFilter;
 import com.engine.voucher.mapper.VoucherMapper;
 import com.engine.voucher.mapper.VoucherOrderMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.core.io.ClassPathResource;
@@ -24,23 +25,29 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements VoucherOrderService {
-
-    private final VoucherMapper voucherMapper;
     // 类成员变量区域：提前加载 Lua 脚本
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
+    private static final DefaultRedisScript<Long> SECKILL_SCRIPT_ROLLBACK;
 
     static {
         SECKILL_SCRIPT = new DefaultRedisScript<>();
         SECKILL_SCRIPT.setLocation(new ClassPathResource("lua/seckill.lua"));
         SECKILL_SCRIPT.setResultType(Long.class);
+
+        SECKILL_SCRIPT_ROLLBACK = new DefaultRedisScript<>();
+        SECKILL_SCRIPT_ROLLBACK.setLocation(new ClassPathResource("lua/seckill_rollback.lua"));
+        SECKILL_SCRIPT_ROLLBACK.setResultType(Long.class);
     }
 
     private final StringRedisTemplate stringRedisTemplate;
     private final RabbitTemplate rabbitTemplate;
     private final VoucherOrderMapper voucherOrderMapper;
+    private final VoucherMapper voucherMapper;
+
 
     @Override
     @Transactional(rollbackFor = Exception.class) // 保证“扣库存”和“创建订单”要么同时成功，要么同时回滚
@@ -100,7 +107,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 //        if (result == 2L) return "每人限领一张，请勿重复抢购";
 //        if (result == 0L) return "抢券成功（已进入异步下单队列）";
 //        return "系统异常";
-        if (result == null || result == 1L) return "手慢了，优惠券已抢光";
+        if (result == 1L) return "手慢了，优惠券已抢光";
         if (result == 2L) return "每人限领一张，请勿重复抢购";
         if (result == 0L) {
             // 1. 雪花算法生成全局唯一订单ID
@@ -128,8 +135,16 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                         }
                 );
             }
-            catch (Exception e) {
+            catch (Exception mqRx) {
+                log.error("抢券消息投递mq失败，准备回滚Redis库存，orderId={}", orderId, mqRx);
                 // srem userid + incr voucher stock lua
+                try {
+                    stringRedisTemplate.execute(SECKILL_SCRIPT_ROLLBACK,
+                            Arrays.asList("seckill:stock:" + voucherId, "seckill:order:" + voucherId ),
+                            userId.toString());
+                } catch (Exception redisEx) {
+                    log.error("MQ投递失败后，Redis回滚也异常，需要依赖定时对账修复，orderId={}, userId={}, voucherId={}", orderId, userId, voucherId, redisEx);
+                }
             }
 
             return "抢券成功，订单号：" + orderId;

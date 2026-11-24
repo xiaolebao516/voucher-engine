@@ -158,14 +158,6 @@ public class OrderCreateConsumer {
     }
 
     private void sendMessageWithHeaders(String exchange, String routingKey, String payload, String traceId, int retryCount) {
-        rabbitTemplate.convertAndSend(exchange, routingKey, payload, msg -> {
-            if (traceId != null && !"NO_TRACE".equals(traceId)) {
-                msg.getMessageProperties().setHeader(TraceIdFilter.TRACE_ID_KEY, traceId);
-            }
-            if (retryCount > 0) {
-                msg.getMessageProperties().setHeader(RETRY_COUNT_HEADER, retryCount);
-            }
-            return msg;
-        });
+        OrderTimeoutConsumer.sendMessageWithHeaders(exchange, routingKey, payload, traceId, retryCount, rabbitTemplate, RETRY_COUNT_HEADER);
     }
 }

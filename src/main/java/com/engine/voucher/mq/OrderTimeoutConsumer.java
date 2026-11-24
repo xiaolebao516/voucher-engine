@@ -2,37 +2,64 @@ package com.engine.voucher.mq;
 
 import com.engine.voucher.config.RabbitMqConfig;
 import com.engine.voucher.entity.VoucherOrder;
-import com.engine.voucher.mapper.VoucherMapper;
+import com.engine.voucher.filter.TraceIdFilter;
 import com.engine.voucher.mapper.VoucherOrderMapper;
 import com.engine.voucher.service.VoucherOrderService;
-import com.engine.voucher.service.VoucherOrderServiceImpl;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.Arrays;
+
+import static com.engine.voucher.config.RabbitMqConfig.ORDER_DLQ_ROUTING_KEY;
+import static com.engine.voucher.config.RabbitMqConfig.ORDER_DLX_EXCHANGE;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderTimeoutConsumer {
+    private static final DefaultRedisScript<Long> SECKILL_SCRIPT_ROLLBACK;
+    private static final String RETRY_COUNT_HEADER = "x-retry-count";
+
+    static {
+        SECKILL_SCRIPT_ROLLBACK = new DefaultRedisScript<>();
+        SECKILL_SCRIPT_ROLLBACK.setLocation(new ClassPathResource("lua/seckill_rollback.lua"));
+        SECKILL_SCRIPT_ROLLBACK.setResultType(Long.class);
+    }
 
     private final VoucherOrderMapper voucherOrderMapper;
-    private final VoucherMapper voucherMapper;
     private final StringRedisTemplate stringRedisTemplate;
-    private final VoucherOrderServiceImpl voucherOrderServiceImpl;
     private final VoucherOrderService voucherOrderService;
+    private final RabbitTemplate rabbitTemplate;
+
 
     @RabbitListener(queues = RabbitMqConfig.ORDER_TIMEOUT_DLQ)
     public void handleOrderTimeout(String orderIdStr, Message message, Channel channel) throws IOException {
-        long deliveryTag = message.getMessageProperties().getDeliveryTag();
-        Long orderId = Long.valueOf(orderIdStr);
+        Object traceIdObj = message.getMessageProperties().getHeader(TraceIdFilter.TRACE_ID_KEY);
+        String traceId = traceIdObj != null ? traceIdObj.toString() : "NO_TRACE";
+        MDC.put(TraceIdFilter.TRACE_ID_KEY, traceId);
 
+        long deliveryTag = message.getMessageProperties().getDeliveryTag();
+        Long orderId = null;
         try {
+            try {
+                orderId = Long.valueOf(orderIdStr);
+            } catch (IllegalArgumentException e){
+                log.error("参数非法", e);
+                sendMessageWithHeaders(ORDER_DLX_EXCHANGE, ORDER_DLQ_ROUTING_KEY, orderIdStr, traceId, 0);
+                channel.basicAck(deliveryTag, false);
+                return;
+            }
             VoucherOrder order = voucherOrderMapper.selectById(orderId);
             if (order == null) {
                 channel.basicAck(deliveryTag, false);
@@ -57,22 +84,42 @@ public class OrderTimeoutConsumer {
             }
             // TODO 2：确实超时未核销！把库存退回 MySQL 和 Redis，并解除该用户的一人一单限制
             // 提示（共 3 句）：
-            // 2.1 MySQL 退库存：voucherMapper.refundStock(order.getVoucherId());
-            // 2.2 Redis 退库存：stringRedisTemplate.opsForValue().increment("seckill:stock:" + order.getVoucherId());
-            // 2.3 Redis 移除已购名单：stringRedisTemplate.opsForSet().remove("seckill:order:" + order.getVoucherId(), order.getUserId().toString());
-//            voucherMapper.refundStock(order.getVoucherId());
-//            stringRedisTemplate.opsForValue().increment("seckill:stock:" + order.getVoucherId());
-//            stringRedisTemplate.opsForSet().remove("seckill:order:" + order.getVoucherId(), order.getUserId().toString());
-            Long removed = stringRedisTemplate.opsForSet().remove("seckill:order:" + order.getVoucherId(), order.getUserId().toString());
-            if (removed != null && removed == 1L) {
-                stringRedisTemplate.opsForValue().increment("seckill:stock:" + order.getVoucherId());
+//          voucherMapper.refundStock(order.getVoucherId());
+//          stringRedisTemplate.opsForValue().increment("seckill:stock:" + order.getVoucherId());
+//          stringRedisTemplate.opsForSet().remove("seckill:order:" + order.getVoucherId(), order.getUserId().toString());
+            try {
+                stringRedisTemplate.execute(SECKILL_SCRIPT_ROLLBACK,
+                        Arrays.asList("seckill:stock:" + order.getVoucherId(), "seckill:order:" + order.getVoucherId()),
+                        order.getUserId().toString()
+                );
+            } catch (Exception redisEx) {
+                log.error("Redis回滚异常，需要依赖定时对账修复，orderId={}, userId={}, voucherId={}", orderId, order.getUserId(), order.getVoucherId(), redisEx);
             }
             channel.basicAck(deliveryTag, false);
             log.info("订单超时未核销，已自动退还库存，orderId={}", orderId);
 
         } catch (Exception e) {
-            log.error("处理超时订单异常，orderId={}", orderId, e);
-            channel.basicNack(deliveryTag, false, false);
+            log.error("处理超时订单异常，转入死信队列，orderId={}", orderId, e);
+            sendMessageWithHeaders(ORDER_DLX_EXCHANGE, ORDER_DLQ_ROUTING_KEY, orderIdStr, traceId, 0);
+            channel.basicAck(deliveryTag, false);
+        } finally {
+            MDC.remove(TraceIdFilter.TRACE_ID_KEY);
         }
     }
+    private void sendMessageWithHeaders(String exchange, String routingKey, String payload, String traceId, int retryCount) {
+        sendMessageWithHeaders(exchange, routingKey, payload, traceId, retryCount, rabbitTemplate, RETRY_COUNT_HEADER);
+    }
+
+    static void sendMessageWithHeaders(String exchange, String routingKey, String payload, String traceId, int retryCount, RabbitTemplate rabbitTemplate, String retryCountHeader) {
+        rabbitTemplate.convertAndSend(exchange, routingKey, payload, msg -> {
+            if (traceId != null && !"NO_TRACE".equals(traceId)) {
+                msg.getMessageProperties().setHeader(TraceIdFilter.TRACE_ID_KEY, traceId);
+            }
+            if (retryCount > 0) {
+                msg.getMessageProperties().setHeader(retryCountHeader, retryCount);
+            }
+            return msg;
+        });
+    }
+
 }
