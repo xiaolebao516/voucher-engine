@@ -1,8 +1,8 @@
 package com.engine.voucher.mq;
 
 import com.engine.voucher.config.RabbitMqConfig;
+import com.engine.voucher.constant.TraceConstant;
 import com.engine.voucher.entity.VoucherOrder;
-import com.engine.voucher.filter.TraceIdFilter;
 import com.engine.voucher.mapper.VoucherOrderMapper;
 import com.engine.voucher.service.VoucherOrderService;
 import com.rabbitmq.client.Channel;
@@ -13,7 +13,6 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -45,9 +44,9 @@ public class OrderTimeoutConsumer {
 
     @RabbitListener(queues = RabbitMqConfig.ORDER_TIMEOUT_DLQ)
     public void handleOrderTimeout(String orderIdStr, Message message, Channel channel) throws IOException {
-        Object traceIdObj = message.getMessageProperties().getHeader(TraceIdFilter.TRACE_ID_KEY);
+        Object traceIdObj = message.getMessageProperties().getHeader(TraceConstant.TRACE_ID_HEADER);
         String traceId = traceIdObj != null ? traceIdObj.toString() : "NO_TRACE";
-        MDC.put(TraceIdFilter.TRACE_ID_KEY, traceId);
+        MDC.put(TraceConstant.TRACE_ID_KEY, traceId);
 
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
         Long orderId = null;
@@ -103,7 +102,7 @@ public class OrderTimeoutConsumer {
             sendMessageWithHeaders(ORDER_DLX_EXCHANGE, ORDER_DLQ_ROUTING_KEY, orderIdStr, traceId, 0);
             channel.basicAck(deliveryTag, false);
         } finally {
-            MDC.remove(TraceIdFilter.TRACE_ID_KEY);
+            MDC.remove(TraceConstant.TRACE_ID_KEY);
         }
     }
     private void sendMessageWithHeaders(String exchange, String routingKey, String payload, String traceId, int retryCount) {
@@ -113,7 +112,7 @@ public class OrderTimeoutConsumer {
     static void sendMessageWithHeaders(String exchange, String routingKey, String payload, String traceId, int retryCount, RabbitTemplate rabbitTemplate, String retryCountHeader) {
         rabbitTemplate.convertAndSend(exchange, routingKey, payload, msg -> {
             if (traceId != null && !"NO_TRACE".equals(traceId)) {
-                msg.getMessageProperties().setHeader(TraceIdFilter.TRACE_ID_KEY, traceId);
+                msg.getMessageProperties().setHeader(TraceConstant.TRACE_ID_HEADER, traceId);
             }
             if (retryCount > 0) {
                 msg.getMessageProperties().setHeader(retryCountHeader, retryCount);

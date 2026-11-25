@@ -9,14 +9,14 @@ services:
       MYSQL_DATABASE: voucher_engine
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --innodb-buffer-pool-size=256M
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./src/main/resources:/docker-entrypoint-initdb.d:ro
 
   redis:
     image: redis:7-alpine
     container_name: ve-redis
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noevition
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine

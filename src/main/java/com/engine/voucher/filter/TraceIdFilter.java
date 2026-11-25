@@ -1,5 +1,6 @@
 package com.engine.voucher.filter;
 
+import com.engine.voucher.constant.TraceConstant;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,23 +15,20 @@ import java.util.UUID;
 @Component
 public class TraceIdFilter extends OncePerRequestFilter {
 
-    public static final String TRACE_ID_KEY = "traceId";
-    public static final String TRACE_ID_HEADER = "X-Trace-Id";
-
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String traceId = request.getHeader(TRACE_ID_HEADER);
+        String traceId = request.getHeader(TraceConstant.TRACE_ID_HEADER);
         if (traceId == null || traceId.isBlank()) {
             traceId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         }
-        MDC.put(TRACE_ID_KEY, traceId);
-        response.setHeader(TRACE_ID_HEADER, traceId);
+        MDC.put(TraceConstant.TRACE_ID_KEY, traceId);
+        response.setHeader(TraceConstant.TRACE_ID_HEADER, traceId);
         try {
             filterChain.doFilter(request, response);
         } finally {
-            MDC.remove(TRACE_ID_KEY);
+            MDC.remove(TraceConstant.TRACE_ID_KEY);
         }
     }
 }

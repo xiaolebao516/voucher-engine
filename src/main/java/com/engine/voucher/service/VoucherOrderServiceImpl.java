@@ -4,9 +4,9 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.engine.voucher.config.RabbitMqConfig;
+import com.engine.voucher.constant.TraceConstant;
 import com.engine.voucher.entity.Voucher;
 import com.engine.voucher.entity.VoucherOrder;
-import com.engine.voucher.filter.TraceIdFilter;
 import com.engine.voucher.mapper.VoucherMapper;
 import com.engine.voucher.mapper.VoucherOrderMapper;
 import lombok.RequiredArgsConstructor;
@@ -122,14 +122,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             // 3. 发送到 RabbitMQ 异步下单队列
 
             try {
-                String traceId = MDC.get(TraceIdFilter.TRACE_ID_KEY);
+                String traceId = MDC.get(TraceConstant.TRACE_ID_KEY);
                 rabbitTemplate.convertAndSend(
                         RabbitMqConfig.ORDER_EXCHANGE,
                         RabbitMqConfig.ORDER_CREATE_ROUTING_KEY,
                         msgJson,
                         message -> {
                             if (traceId != null) {
-                                message.getMessageProperties().setHeader(TraceIdFilter.TRACE_ID_KEY, traceId);
+                                message.getMessageProperties().setHeader(TraceConstant.TRACE_ID_KEY, traceId);
                             }
                             return message;
                         }

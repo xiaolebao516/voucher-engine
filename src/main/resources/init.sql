@@ -39,3 +39,21 @@ CREATE TABLE `tb_mq_consume_log` (
 -- 初始化一条测试数据：100张晚高峰5折打车神券
 INSERT INTO `tb_voucher` (`id`, `title`, `stock`, `status`, `begin_time`, `end_time`, `expire_seconds`)
 VALUES (1, '晚高峰打车5折立减神券', 100, 1, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 900);
+
+CREATE TABLE `tb_local_message` (
+    `id` BIGINT NOT NULL COMMENT '消息主键',
+    `biz_type` VARCHAR(32) NOT NULL COMMENT '业务类型',
+    `biz_id` VARCHAR(64) NOT NULL COMMENT '业务唯一id',
+    `exchange` VARCHAR(128) NOT NULL COMMENT '目标交换机',
+    `routing_key` VARCHAR(128) NOT NULL COMMENT '目标路由键',
+    `payload` TEXT NOT NULL COMMENT '消息体内容',
+    `trace_id` VARCHAR(64) DEFAULT NULL COMMENT '链路追踪id',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT'状态0-待投递 1-已投递 2-失败重试中',
+    `retry_count` INT NOT NULL DEFAULT 0 COMMENT '已重试次数',
+    `next_retry_time` DATETIME NOT NULL COMMENT '下次允许重试时间',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_biz` (`biz_type`, `biz_id`),
+    KEY `idx_status_next_retry` (`status`, `next_retry_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='本地消息表';

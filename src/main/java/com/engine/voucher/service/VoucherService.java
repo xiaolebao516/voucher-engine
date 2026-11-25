@@ -5,5 +5,8 @@ import com.engine.voucher.entity.Voucher;
 
 public interface VoucherService extends IService<Voucher> {
     void warmupVoucher(Long id);
+
+    void rebuildVoucherDetailCache(Long id);
+
     Voucher queryVoucherById(Long id);
 }

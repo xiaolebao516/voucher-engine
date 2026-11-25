@@ -3,12 +3,13 @@ package com.engine.voucher.mq;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.engine.voucher.config.RabbitMqConfig;
+import com.engine.voucher.constant.TraceConstant;
 import com.engine.voucher.entity.MqConsumeLog;
 import com.engine.voucher.entity.VoucherOrder;
-import com.engine.voucher.filter.TraceIdFilter;
 import com.engine.voucher.mapper.MqConsumeLogMapper;
 import com.engine.voucher.mapper.VoucherMapper;
 import com.engine.voucher.mapper.VoucherOrderMapper;
+import com.engine.voucher.service.LocalMessageService;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,7 @@ public class OrderCreateConsumer {
     private final RabbitTemplate rabbitTemplate;
     private final TransactionTemplate transactionTemplate;
     private final StringRedisTemplate stringRedisTemplate;
+    private final LocalMessageService localMessageService;
 
     private enum TxResult {
         SUCCESS,
@@ -55,9 +57,9 @@ public class OrderCreateConsumer {
 
     @RabbitListener(queues = RabbitMqConfig.ORDER_CREATE_QUEUE)
     public void handleOrderCreate(String msgJson, Message message, Channel channel) throws IOException {
-        Object traceIdObj = message.getMessageProperties().getHeader(TraceIdFilter.TRACE_ID_KEY);
+        Object traceIdObj = message.getMessageProperties().getHeader(TraceConstant.TRACE_ID_HEADER);
         String traceId = traceIdObj != null ? traceIdObj.toString() : "NO_TRACE";
-        MDC.put(TraceIdFilter.TRACE_ID_KEY, traceId);
+        MDC.put(TraceConstant.TRACE_ID_KEY, traceId);
 
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
 
@@ -110,6 +112,14 @@ public class OrderCreateConsumer {
                         return TxResult.DUPLICATE_ORDER;
                     }
 
+                    localMessageService.saveAndSendAfterCommit(
+                            "ORDER_TIMEOUT",
+                            orderId.toString(),
+                            ORDER_DELAY_EXCHANGE,
+                            ORDER_DELAY_ROUTING_KEY,
+                            orderId.toString()
+                    );
+
                     return TxResult.SUCCESS;
                 });
 
@@ -121,12 +131,12 @@ public class OrderCreateConsumer {
 
                 if (txResult == TxResult.DUPLICATE_ORDER) {
                     log.warn("检测到用户重复下单触发唯一索引冲突，已回滚数据库并补偿Redis库存，userId={}, voucherId={}", userId, voucherId);
+                    // TODO:补偿redis库存加入消息表
                     stringRedisTemplate.opsForValue().increment(SECKILL_STOCK_PREFIX + voucherId);
                     channel.basicAck(deliveryTag, false);
                     return;
                 }
 
-                sendMessageWithHeaders(ORDER_DELAY_EXCHANGE, ORDER_DELAY_ROUTING_KEY, orderId.toString(), traceId, 0);
                 channel.basicAck(deliveryTag, false);
                 log.info("异步下单落库成功，orderId={}", orderId);
 
@@ -145,7 +155,7 @@ public class OrderCreateConsumer {
                 channel.basicAck(deliveryTag, false);
             }
         } finally {
-            MDC.remove(TraceIdFilter.TRACE_ID_KEY);
+            MDC.remove(TraceConstant.TRACE_ID_KEY);
         }
     }
 
