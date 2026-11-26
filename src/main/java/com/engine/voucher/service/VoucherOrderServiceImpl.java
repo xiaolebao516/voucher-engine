@@ -52,33 +52,26 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Override
     @Transactional(rollbackFor = Exception.class) // 保证“扣库存”和“创建订单”要么同时成功，要么同时回滚
     public String seckillByDb(Long voucherId, Long userId) {
-        // TODO 1：校验优惠券是否存在、状态是否为上架(status == 1)、当前时间是否在 beginTime 和 endTime 之间
-        // 提示：用 voucherMapper.selectById(voucherId) 查出券，不满足条件直接 return 对应的失败提示字符串
+        // 校验优惠券是否存在、状态是否为上架(status == 1)、当前时间是否在 beginTime 和 endTime 之间
         Voucher voucher = voucherMapper.selectById(voucherId);
         if (voucher == null) return "优惠券不存在";
-        if (voucher.getStatus() != 1) return "优惠券未上架或已下架";
+        if (!Integer.valueOf(1).equals(voucher.getStatus())) return "优惠券未上架或已下架";
         if (LocalDateTime.now().isAfter(voucher.getEndTime()) || LocalDateTime.now().isBefore(voucher.getBeginTime()))
             return "不在抢购时间范围内";
-        // TODO 2：校验“一人一单”（先在代码层拦一道，减少无效更新）
-        // 提示：使用 MyBatis-Plus 提供的链式查询统计当前用户是否已买过该券：
+        // 校验“一人一单”（先在代码层拦一道，减少无效更新）
          Long count = lambdaQuery().eq(VoucherOrder::getUserId, userId).eq(VoucherOrder::getVoucherId, voucherId).count();
         // 如果 count > 0，直接 return "每人限领一张，请勿重复抢购";
         if (count > 0) return "每人限领一张，请勿重复抢购";
-        // TODO 3：调用 voucherMapper.deductStock(voucherId) 乐观锁扣减库存
-        // 提示：该方法返回受影响的行数（int updated），如果 updated == 0，说明库存已被抢光，return "手慢了，优惠券已抢光";
+        // 调用 voucherMapper.deductStock(voucherId) 乐观锁扣减库存
         int updated = voucherMapper.deductStock(voucherId);
         if (updated == 0) return "手慢了，优惠券已抢光";
-        // TODO 4：创建订单并写入 tb_voucher_order 表
-        // 提示：new 一个 VoucherOrder，用 IdUtil.getSnowflakeNextId() 设置全局唯一 id，
-        // 设置 userId、voucherId、status = 0、createTime = LocalDateTime.now()，
+        // 创建订单并写入 tb_voucher_order 表
         VoucherOrder order = new VoucherOrder();
         order.setId(IdUtil.getSnowflakeNextId());
         order.setVoucherId(voucherId);
         order.setUserId(userId);
         order.setCreateTime(LocalDateTime.now());
         order.setStatus(0);
-        // 然后用 try { save(order); } catch (DuplicateKeyException e) { ... } 捕获数据库唯一索引冲突（并发下防止同一个用户同时发两个请求绕过 TODO 2）
-        // 如果捕获到 DuplicateKeyException，抛 RuntimeException 或直接返回提示（注意：为了让 @Transactional 回滚刚才扣掉的库存，并发撞车时应该抛出异常！）
         try {
             save(order);
         }
@@ -90,26 +83,15 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Override
     public String seckillByRedis(Long voucherId, Long userId) {
-        // TODO 1：执行 Lua 脚本
-        // 提示：调用 stringRedisTemplate.execute(脚本对象, Keys列表, Args可变参数)
-        // Keys列表用 Arrays.asList("seckill:stock:" + voucherId, "seckill:order:" + voucherId)
-        // Args传 userId.toString()，返回值用 Long result 接收
+        // 执行 Lua 脚本
         Long result = stringRedisTemplate.execute(SECKILL_SCRIPT,
                 Arrays.asList("seckill:stock:" + voucherId, "seckill:order:" + voucherId),
                 userId.toString());
 
-        // TODO 2：根据 Lua 脚本的返回值判断结果
-        // 提示：
-        // 如果 result == null || result == 1L，返回 "手慢了，优惠券已抢光"
-        // 如果 result == 2L，返回 "每人限领一张，请勿重复抢购"
-        // 如果是 0L，返回 "抢券成功（已进入异步下单队列）"
-//        if (result == null || result == 1L) return "手慢了，优惠券已抢光";
-//        if (result == 2L) return "每人限领一张，请勿重复抢购";
-//        if (result == 0L) return "抢券成功（已进入异步下单队列）";
-//        return "系统异常";
-        if (result == 1L) return "手慢了，优惠券已抢光";
-        if (result == 2L) return "每人限领一张，请勿重复抢购";
-        if (result == 0L) {
+        // 根据 Lua 脚本的返回值判断结果
+        if (Long.valueOf(1L).equals(result)) return "手慢了，优惠券已抢光";
+        if (Long.valueOf(2L).equals(result)) return "每人限领一张，请勿重复抢购";
+        if (Long.valueOf(0L).equals(result)) {
             // 1. 雪花算法生成全局唯一订单ID
             long orderId = IdUtil.getSnowflakeNextId();
             // 2. 组装消息体（用 JSON 字符串最通用，避免跨服务序列化兼容问题）
@@ -141,6 +123,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                     stringRedisTemplate.execute(SECKILL_SCRIPT_ROLLBACK,
                             Arrays.asList("seckill:stock:" + voucherId, "seckill:order:" + voucherId ),
                             userId.toString());
+                    return "系统繁忙，抢券失败，请稍后重试";
                 } catch (Exception redisEx) {
                     log.error("MQ投递失败后，Redis回滚也异常，需要依赖定时对账修复，orderId={}, userId={}, voucherId={}", orderId, userId, voucherId, redisEx);
                 }

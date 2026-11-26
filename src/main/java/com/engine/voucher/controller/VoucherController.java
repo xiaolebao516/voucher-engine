@@ -22,4 +22,10 @@ public class VoucherController {
     public Voucher queryById(@PathVariable Long id) {
         return voucherService.queryVoucherById(id);
     }
+
+    @PostMapping("/{id}/offline")
+    public String offline(@PathVariable Long id) {
+        voucherService.offlineVoucher(id);
+        return "已下架id为" + id + "的券";
+    }
 }

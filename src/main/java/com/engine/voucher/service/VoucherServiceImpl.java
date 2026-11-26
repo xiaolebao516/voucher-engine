@@ -64,7 +64,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
     @Override
     public void warmupVoucher(Long id) {
         Voucher voucher = getById(id);
-        if (voucher == null) {
+        if (voucher == null || !Integer.valueOf(1).equals(voucher.getStatus())) {
             return;
         }
         RedisData redisData = new RedisData();
@@ -142,7 +142,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         Voucher voucher = JSONUtil.toBean((JSONObject) redisData.getData(), Voucher.class);
         if (redisData.getExpireTime().isAfter(LocalDateTime.now())) return voucher;
 
-        String traceId = MDC.get(TraceConstant.TRACE_ID_KEY);
+//        String traceId = MDC.get(TraceConstant.TRACE_ID_KEY);
 
         if (!rebuildingIds.add(id)) {
             return voucher;
@@ -157,11 +157,10 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
                         return;
                     }
                     String newJson = stringRedisTemplate.opsForValue().get("voucher:detail:" + id);
-                    if (StrUtil.isNotBlank(newJson)) {
-                        RedisData newRedisData = JSONUtil.toBean(newJson, RedisData.class);
-                        if (newRedisData.getExpireTime().isAfter(LocalDateTime.now())) {
-                            return;
-                        }
+                    if(StrUtil.isBlank(newJson)) return;
+                    RedisData newRedisData = JSONUtil.toBean(newJson, RedisData.class);
+                    if (newRedisData.getExpireTime().isAfter(LocalDateTime.now())) {
+                        return;
                     }
                     this.rebuildWithRetryAndAlert(id);
                 } catch (Exception e) {
