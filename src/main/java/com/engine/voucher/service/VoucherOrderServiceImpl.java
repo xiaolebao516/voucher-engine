@@ -120,7 +120,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             String msgJson = JSONUtil.toJsonStr(msgMap);
 
             // 3. 发送到 RabbitMQ 异步下单队列
-
             try {
                 String traceId = MDC.get(TraceConstant.TRACE_ID_KEY);
                 rabbitTemplate.convertAndSend(
@@ -129,7 +128,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                         msgJson,
                         message -> {
                             if (traceId != null) {
-                                message.getMessageProperties().setHeader(TraceConstant.TRACE_ID_KEY, traceId);
+                                message.getMessageProperties().setHeader(TraceConstant.TRACE_ID_HEADER, traceId);
                             }
                             return message;
                         }

@@ -3,7 +3,9 @@ package com.engine.voucher;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
+@EnableScheduling
 @SpringBootApplication
 @MapperScan("com.engine.voucher.mapper")
 public class VoucherEngineApplication {

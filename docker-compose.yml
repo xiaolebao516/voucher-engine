@@ -16,7 +16,7 @@ services:
     container_name: ve-redis
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noevition
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
