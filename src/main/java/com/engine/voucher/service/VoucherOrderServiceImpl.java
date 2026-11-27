@@ -138,10 +138,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                     stringRedisTemplate.execute(SECKILL_SCRIPT_ROLLBACK,
                             Arrays.asList("seckill:stock:" + voucherId, "seckill:order:" + voucherId ),
                             userId.toString());
-                    return "系统繁忙，抢券失败，请稍后重试";
                 } catch (Exception redisEx) {
                     log.error("MQ投递失败后，Redis回滚也异常，需要依赖定时对账修复，orderId={}, userId={}, voucherId={}", orderId, userId, voucherId, redisEx);
                 }
+                return "系统繁忙，抢券结果待确认，请稍后查询";
             }
 
             return "抢券成功，订单号：" + orderId;

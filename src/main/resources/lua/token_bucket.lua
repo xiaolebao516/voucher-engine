@@ -5,6 +5,19 @@
 -- ARGV[3]: 全局桶容量
 -- ARGV[4]: 全局补充速率
 
+-- 在任何写操作之前校验两个桶的全部参数，避免脚本异常留下部分状态。
+local userCapacity = tonumber(ARGV[1])
+local userRate = tonumber(ARGV[2])
+local globalCapacity = tonumber(ARGV[3])
+local globalRate = tonumber(ARGV[4])
+local function valid(v)
+    return v ~= nil and v > 0 and v <= 2147483647 and v == math.floor(v)
+end
+if not valid(userCapacity) or not valid(userRate) or
+   not valid(globalCapacity) or not valid(globalRate) then
+    return redis.error_reply('ERR token bucket capacity and rate must be positive integers')
+end
+
 local time = redis.call('TIME')
 local now = tonumber(time[1]) * 1000
           + math.floor(tonumber(time[2]) / 1000)
@@ -40,12 +53,12 @@ local function tryAcquire(key, capacity, rate)
 end
 
 -- 用户级限流
-if not tryAcquire(KEYS[1], tonumber(ARGV[1]), tonumber(ARGV[2])) then
+if not tryAcquire(KEYS[1], userCapacity, userRate) then
     return 0
 end
 
 -- 全局限流
-if not tryAcquire(KEYS[2], tonumber(ARGV[3]), tonumber(ARGV[4])) then
+if not tryAcquire(KEYS[2], globalCapacity, globalRate) then
     return 1
 end
 

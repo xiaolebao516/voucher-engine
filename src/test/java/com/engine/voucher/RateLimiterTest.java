@@ -58,6 +58,23 @@ class RateLimiterTest {
         return id;
     }
 
+    @Test
+    @DisplayName("非法参数：两个桶任一容量或速率非正时拒绝，且不写入 Redis")
+    void testInvalidParameters() {
+        Long user = newUser(99);
+        rateLimiter.clearBuckets(user);
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> rateLimiter.tryAcquire(user, 5, 0, 10, 1));
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> rateLimiter.tryAcquire(user, 5, 1, 10, 0));
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> rateLimiter.tryAcquire(user, 0, 1, 10, 1));
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> rateLimiter.tryAcquire(user, 5, 1, -1, 1));
+        Assertions.assertFalse(Boolean.TRUE.equals(stringRedisTemplate.hasKey("rate:seckill:{limit}:user:" + user)));
+        Assertions.assertFalse(Boolean.TRUE.equals(stringRedisTemplate.hasKey("rate:seckill:{limit}:global")));
+    }
+
     // ==================== 1. 用户级限流 ====================
 
     @Test

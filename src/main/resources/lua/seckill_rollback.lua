@@ -8,6 +8,11 @@ if (redis.call('sismember', KEYS[2], ARGV[1]) == 0) then
 end
 
 -- 移除用户抢券记录，补偿库存
+-- 已下架或库存 Key 缺失时，不通过 INCR 重新创建库存。
+if redis.call('EXISTS', KEYS[1]) == 0 then
+    redis.call('srem', KEYS[2], ARGV[1])
+    return 2
+end
 redis.call('srem', KEYS[2], ARGV[1])
 redis.call('incr', KEYS[1])
 return 1

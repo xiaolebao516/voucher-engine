@@ -53,6 +53,7 @@ public class RateLimiter {
                        @Value("${seckill.rate-limit.user-rate:2}") int userRate,
                        @Value("${seckill.rate-limit.global-capacity:1000}") int globalCapacity,
                        @Value("${seckill.rate-limit.global-rate:400}") int globalRate) {
+        validateParameters(userCapacity, userRate, globalCapacity, globalRate);
         this.stringRedisTemplate = stringRedisTemplate;
         this.enabled = enabled;
         this.userCapacity = userCapacity;
@@ -86,6 +87,7 @@ public class RateLimiter {
      */
     public int tryAcquire(Long userId, int userCapacity, int userRate,
                           int globalCapacity, int globalRate) {
+        validateParameters(userCapacity, userRate, globalCapacity, globalRate);
         Long result = stringRedisTemplate.execute(
                 SCRIPT_TOKEN_BUCKET,
                 Arrays.asList(
@@ -103,6 +105,13 @@ public class RateLimiter {
         }
 
         return result.intValue();
+    }
+
+    private static void validateParameters(int userCapacity, int userRate,
+                                           int globalCapacity, int globalRate) {
+        if (userCapacity <= 0 || userRate <= 0 || globalCapacity <= 0 || globalRate <= 0) {
+            throw new IllegalArgumentException("令牌桶容量与补充速率必须为正数");
+        }
     }
 
     /** 供测试清理 key，避免用例之间互相污染 */

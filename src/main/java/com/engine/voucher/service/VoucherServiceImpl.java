@@ -69,7 +69,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         redisData.setExpireTime(LocalDateTime.now().plusMinutes(30));
         stringRedisTemplate.opsForValue().set("voucher:detail:" + id, JSONUtil.toJsonStr(redisData));
         bloomFilter.add(id);
-        stringRedisTemplate.opsForValue().set("seckill:stock:" + id, voucher.getStock().toString());
+        stringRedisTemplate.opsForValue().setIfAbsent("seckill:stock:" + id, voucher.getStock().toString());
     }
 
     @Override
