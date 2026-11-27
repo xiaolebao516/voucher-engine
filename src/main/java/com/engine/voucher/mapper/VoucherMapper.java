@@ -4,10 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.engine.voucher.entity.Voucher;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-
-import java.util.List;
 
 @Mapper
 public interface VoucherMapper extends BaseMapper<Voucher> {
@@ -19,6 +16,4 @@ public interface VoucherMapper extends BaseMapper<Voucher> {
     @Update("UPDATE tb_voucher SET stock = stock + 1 WHERE id = #{id}")
     int refundStock(@Param("id") Long id);
 
-    @Select("SELECT id FROM tb_voucher WHERE status = 1")
-    List<Voucher> selectActiveSeckillVouchers();
 }

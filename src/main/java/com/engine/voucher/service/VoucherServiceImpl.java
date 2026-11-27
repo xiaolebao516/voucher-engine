@@ -4,18 +4,15 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.engine.voucher.constant.TraceConstant;
 import com.engine.voucher.dto.RedisData;
 import com.engine.voucher.entity.Voucher;
 import com.engine.voucher.mapper.VoucherMapper;
 import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
@@ -41,7 +38,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
 
     // 专门用来异步重建缓存的后台线程池（避免每次重建都临时创建销毁线程） 线程池用无界队列是大忌
 //    private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(4);
-    private static final AtomicInteger THREAD_COUNTER = new AtomicInteger(1);
+//    private static final AtomicInteger THREAD_COUNTER = new AtomicInteger(1);
 //    private static final ExecutorService CACHE_REBUILD_EXECUTOR = new ThreadPoolExecutor(
 //            2,
 //            4,
@@ -250,7 +247,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         // 1. 先落库改状态（单条 SQL 自动提交，不要加 @Transactional 包住下面的 Redis 操作）
         boolean updated = lambdaUpdate()
                 .eq(Voucher::getId, id)
-                .set(Voucher::getStatus, 0)
+                .set(Voucher::getStatus, 2)
                 .update();
         if (!updated) {
             return;

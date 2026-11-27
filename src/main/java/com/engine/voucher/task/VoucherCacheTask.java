@@ -1,5 +1,6 @@
 package com.engine.voucher.task;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.engine.voucher.entity.Voucher;
 import com.engine.voucher.mapper.VoucherMapper;
 import com.engine.voucher.service.VoucherService;
@@ -31,7 +32,9 @@ public class VoucherCacheTask {
         }
         try {
             // 查询状态为上架(status=1)的秒杀券
-            List<Voucher> activeList = voucherMapper.selectActiveSeckillVouchers();
+            List<Voucher> activeList = voucherMapper.selectList(
+                    new LambdaQueryWrapper<Voucher>().eq(Voucher::getStatus, 1)
+            );
             for (Voucher voucher : activeList) {
                 try {
                     // 强刷详情缓存 + 自动补录布隆过滤器，用重载的Voucher方法，避免1+N查库
