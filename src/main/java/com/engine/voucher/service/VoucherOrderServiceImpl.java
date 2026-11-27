@@ -12,6 +12,7 @@ import com.engine.voucher.mapper.VoucherOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DuplicateKeyException;
@@ -113,7 +114,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                                 message.getMessageProperties().setHeader(TraceConstant.TRACE_ID_HEADER, traceId);
                             }
                             return message;
-                        }
+                        },
+                        new CorrelationData("SECKILL:" + orderId + ":" + voucherId + ":" + userId)
                 );
             }
             catch (Exception mqRx) {

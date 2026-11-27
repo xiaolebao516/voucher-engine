@@ -8,6 +8,7 @@ import com.engine.voucher.mapper.LocalMessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -62,15 +63,22 @@ public class LocalMessageService {
     public void sendMessage(LocalMessage msg) {
         // 发消息异常需要sendFailed，如果不做异常处理，会把异常抛出，但回调时，事务已经提交，消息会发2次
         try {
-            rabbitTemplate.convertAndSend(msg.getExchange(), msg.getRoutingKey(), message -> {
-                message.getMessageProperties().setMessageId(String.valueOf(msg.getId()));
-                if (msg.getTraceId() != null) {
-                    message.getMessageProperties().setHeader(TraceConstant.TRACE_ID_HEADER, msg.getTraceId());
-                }
-                return message;
-            });
+            CorrelationData correlationData = new CorrelationData("LOCAL_MSG:" + msg.getId());
+            rabbitTemplate.convertAndSend(
+                    msg.getExchange(),
+                    msg.getRoutingKey(),
+                    msg.getPayload(),
+                    message -> {
+                        message.getMessageProperties().setMessageId(String.valueOf(msg.getId()));
+                        if (msg.getTraceId() != null) {
+                            message.getMessageProperties().setHeader(TraceConstant.TRACE_ID_HEADER, msg.getTraceId());
+                        }
+                        return message;
+                    },
+                    correlationData
+            );
             // 投递成功，修改下游状态，但不原子，实在失败，靠幂等兜底，起码不丢消息
-            localMessageMapper.markSent(msg.getId());
+//            localMessageMapper.markSent(msg.getId());
         } catch (Exception e) {
             // 投递失败，先做延迟重试，指数退避，超过最大重试次数，置为Failed
             int currentRetry = msg.getRetryCount() == null ? 0 :  msg.getRetryCount();

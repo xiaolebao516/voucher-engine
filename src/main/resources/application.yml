@@ -19,6 +19,10 @@ spring:
     listener:
       simple:
         acknowledge-mode: manual # 强制手动ACK：写库成功才删消息，防止断电丢单
+    publisher-confirm-type: correlated   # 开启异步确认（到达 Exchange 回调）
+    publisher-returns: true              # 开启路由失败退回（到达不了 Queue 回调）
+    template:
+      mandatory: true                    # 必须配 true，否则路由失败不会触发 ReturnsCallback
 
 mybatis-plus:
   configuration:

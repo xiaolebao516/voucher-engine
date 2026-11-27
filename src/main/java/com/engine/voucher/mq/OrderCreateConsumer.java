@@ -17,21 +17,18 @@ import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
-import static com.engine.voucher.config.RabbitMqConfig.ORDER_DELAY_EXCHANGE;
-import static com.engine.voucher.config.RabbitMqConfig.ORDER_DELAY_ROUTING_KEY;
-import static com.engine.voucher.config.RabbitMqConfig.ORDER_DLQ_ROUTING_KEY;
-import static com.engine.voucher.config.RabbitMqConfig.ORDER_DLX_EXCHANGE;
-import static com.engine.voucher.config.RabbitMqConfig.ORDER_RETRY_30S_ROUTING_KEY;
-import static com.engine.voucher.config.RabbitMqConfig.ORDER_RETRY_5S_ROUTING_KEY;
-import static com.engine.voucher.config.RabbitMqConfig.ORDER_RETRY_EXCHANGE;
+import static com.engine.voucher.config.RabbitMqConfig.*;
 
 @Slf4j
 @Component
@@ -48,6 +45,15 @@ public class OrderCreateConsumer {
     private final TransactionTemplate transactionTemplate;
     private final StringRedisTemplate stringRedisTemplate;
     private final LocalMessageService localMessageService;
+
+    private static final String SECKILL_COMP_PREFIX = "seckill:comp:";
+    private static final DefaultRedisScript<Long> COMPENSATE_STOCK_SCRIPT;
+
+    static {
+        COMPENSATE_STOCK_SCRIPT = new DefaultRedisScript<>();
+        COMPENSATE_STOCK_SCRIPT.setLocation(new ClassPathResource("lua/seckill_compensate_stock.lua"));
+        COMPENSATE_STOCK_SCRIPT.setResultType(Long.class);
+    }
 
     private enum TxResult {
         SUCCESS,
@@ -130,9 +136,21 @@ public class OrderCreateConsumer {
                 }
 
                 if (txResult == TxResult.DUPLICATE_ORDER) {
-                    log.warn("检测到用户重复下单触发唯一索引冲突，已回滚数据库并补偿Redis库存，userId={}, voucherId={}", userId, voucherId);
-                    // TODO:补偿redis库存加入消息表
-                    stringRedisTemplate.opsForValue().increment(SECKILL_STOCK_PREFIX + voucherId);
+                    Long compResult = stringRedisTemplate.execute(
+                            COMPENSATE_STOCK_SCRIPT,
+                            Arrays.asList(SECKILL_STOCK_PREFIX + voucherId, SECKILL_COMP_PREFIX + orderId),
+                            "604800"
+                            // 过期时间比活动时间长就可以
+                    );
+                    if (Long.valueOf(0L).equals(compResult)) {
+                        log.warn("用户重复下单，已回滚DB并原子补偿Redis库存，orderId={}, userId={}, voucherId={}", orderId, userId, voucherId);
+                    } else if (Long.valueOf(1L).equals(compResult)) {
+                        log.warn("用户重复下单，该订单已补偿过Redis库存，幂等跳过，orderId={}", orderId);
+                    } else if (Long.valueOf(2L).equals(compResult)) {
+                        log.warn("用户重复下单，但券库存Key已不存在(可能已下架)，跳过补偿，orderId={}, voucherId={}", orderId, voucherId);
+                    } else {
+                        throw new IllegalStateException("Redis库存补偿脚本返回为空");
+                    }
                     channel.basicAck(deliveryTag, false);
                     return;
                 }
