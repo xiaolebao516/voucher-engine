@@ -24,6 +24,14 @@ spring:
     template:
       mandatory: true                    # 必须配 true，否则路由失败不会触发 ReturnsCallback
 
+  task:
+    scheduling:
+      pool:
+        # 默认只有 1 个调度线程，三个 @Scheduled 任务会互相排队：
+        # 数据清理一旦跑上几分钟，每 3 秒一次的本地消息投递就会被完全阻塞。
+        # 这里给到 4，保证清理任务和投递任务互不干扰。
+        size: 4
+
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true

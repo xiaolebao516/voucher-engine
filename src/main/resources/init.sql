@@ -33,7 +33,9 @@ CREATE TABLE `tb_mq_consume_log` (
   `msg_id` VARCHAR(64) NOT NULL COMMENT 'MQ消息唯一ID',
   `biz_type` VARCHAR(32) NOT NULL COMMENT '业务类型',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`msg_id`)
+  PRIMARY KEY (`msg_id`),
+  -- 清理任务按 create_time 分批删除，没有这个索引每批都要全表扫描
+  KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MQ消费幂等记录表';
 
 -- 初始化一条测试数据：100张晚高峰5折打车神券
@@ -55,5 +57,8 @@ CREATE TABLE `tb_local_message` (
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_biz` (`biz_type`, `biz_id`),
-    KEY `idx_status_next_retry` (`status`, `next_retry_time`)
+    KEY `idx_status_next_retry` (`status`, `next_retry_time`),
+    -- 清理任务（status IN (1,2) AND update_time < ?）和 status=2 告警扫描
+    -- （status = 2 AND update_time > ?）都走这个联合索引，单列 update_time 覆盖不了
+    KEY `idx_status_update_time` (`status`, `update_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='本地消息表';
