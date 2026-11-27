@@ -1,0 +1,216 @@
+[
+  {
+    "target_concurrency": 500,
+    "client": "node",
+    "duration_sec": 8,
+    "stock": 12000,
+    "timestamp": "2026-11-27T21:57:55",
+    "elapsed_sec": 8.61,
+    "drain_sec": 53.73,
+    "http": {
+      "total": 10816,
+      "success_200": 4176,
+      "biz_rejected_200": 0,
+      "rate_limited_429": 6640,
+      "unavailable_503": 0,
+      "error": 0
+    },
+    "rates": {
+      "request_qps": 1256.36,
+      "steady_qps": 1585.8,
+      "success_qps": 485.07,
+      "rate_limited_pct": 61.39,
+      "error_pct": 0.0
+    },
+    "latency_ms": {
+      "p50": 346,
+      "p99": 1280.5
+    },
+    "per_sec": [
+      839,
+      1150,
+      1407,
+      1407,
+      1534,
+      1918,
+      1663
+    ],
+    "orders_persisted": 4176,
+    "order_throughput_qps": 66.99,
+    "mq_peak": {
+      "ready": 0,
+      "unacked": 0
+    },
+    "db_stock_after": "7824",
+    "redis_stock_after": "7824",
+    "db_pool": {
+      "mysql_active_connections": 12
+    },
+    "containers": [
+      "ve-redis\t3.64%\t14.8MiB / 6.617GiB",
+      "ve-mysql\t3.50%\t644.8MiB / 6.617GiB",
+      "ve-mq\t5.61%\t232MiB / 6.617GiB"
+    ],
+    "label": "on-unique"
+  },
+  {
+    "target_concurrency": 1000,
+    "client": "node",
+    "duration_sec": 8,
+    "stock": 12000,
+    "timestamp": "2026-11-27T21:59:10",
+    "elapsed_sec": 9.17,
+    "drain_sec": 44.07,
+    "http": {
+      "total": 7757,
+      "success_200": 3815,
+      "biz_rejected_200": 0,
+      "rate_limited_429": 3942,
+      "unavailable_503": 0,
+      "error": 0
+    },
+    "rates": {
+      "request_qps": 845.48,
+      "steady_qps": 1151.6,
+      "success_qps": 415.82,
+      "rate_limited_pct": 50.82,
+      "error_pct": 0.0
+    },
+    "latency_ms": {
+      "p50": 854.4,
+      "p99": 3578.3
+    },
+    "per_sec": [
+      1001,
+      351,
+      767,
+      1151,
+      1152,
+      896,
+      1792
+    ],
+    "orders_persisted": 3815,
+    "order_throughput_qps": 71.65,
+    "mq_peak": {
+      "ready": 0,
+      "unacked": 0
+    },
+    "db_stock_after": "8185",
+    "redis_stock_after": "8185",
+    "db_pool": {
+      "mysql_active_connections": 12
+    },
+    "containers": [
+      "ve-redis\t3.81%\t14.25MiB / 6.617GiB",
+      "ve-mysql\t1.25%\t645.9MiB / 6.617GiB",
+      "ve-mq\t1.31%\t227.5MiB / 6.617GiB"
+    ],
+    "label": "on-unique"
+  },
+  {
+    "target_concurrency": 3000,
+    "client": "node",
+    "duration_sec": 8,
+    "stock": 12000,
+    "timestamp": "2026-11-27T22:00:18",
+    "elapsed_sec": 9.22,
+    "drain_sec": 37.79,
+    "http": {
+      "total": 8528,
+      "success_200": 3351,
+      "biz_rejected_200": 0,
+      "rate_limited_429": 5177,
+      "unavailable_503": 0,
+      "error": 0
+    },
+    "rates": {
+      "request_qps": 924.51,
+      "steady_qps": 1235.5,
+      "success_qps": 363.28,
+      "rate_limited_pct": 60.71,
+      "error_pct": 0.0
+    },
+    "latency_ms": {
+      "p50": 1922.1,
+      "p99": 6293.2
+    },
+    "per_sec": [
+      3001,
+      199,
+      73,
+      1666,
+      1665,
+      1538
+    ],
+    "orders_persisted": 3351,
+    "order_throughput_qps": 71.28,
+    "mq_peak": {
+      "ready": 0,
+      "unacked": 0
+    },
+    "db_stock_after": "8649",
+    "redis_stock_after": "8649",
+    "db_pool": {
+      "mysql_active_connections": 12
+    },
+    "containers": [
+      "ve-redis\t3.23%\t14.5MiB / 6.617GiB",
+      "ve-mysql\t3.59%\t648.1MiB / 6.617GiB",
+      "ve-mq\t8.67%\t251.9MiB / 6.617GiB"
+    ],
+    "label": "on-unique"
+  },
+  {
+    "target_concurrency": 5000,
+    "client": "node",
+    "duration_sec": 8,
+    "stock": 12000,
+    "timestamp": "2026-11-27T22:01:22",
+    "elapsed_sec": 10.66,
+    "drain_sec": 31.28,
+    "http": {
+      "total": 6488,
+      "success_200": 2619,
+      "biz_rejected_200": 0,
+      "rate_limited_429": 3869,
+      "unavailable_503": 0,
+      "error": 0
+    },
+    "rates": {
+      "request_qps": 608.36,
+      "steady_qps": 322,
+      "success_qps": 245.57,
+      "rate_limited_pct": 59.63,
+      "error_pct": 0.0
+    },
+    "latency_ms": {
+      "p50": 8026.3,
+      "p99": 9069.2
+    },
+    "per_sec": [
+      5001,
+      199,
+      0,
+      634,
+      654,
+      0
+    ],
+    "orders_persisted": 2619,
+    "order_throughput_qps": 62.44,
+    "mq_peak": {
+      "ready": 0,
+      "unacked": 0
+    },
+    "db_stock_after": "9381",
+    "redis_stock_after": "9381",
+    "db_pool": {
+      "mysql_active_connections": 12
+    },
+    "containers": [
+      "ve-redis\t4.14%\t14.46MiB / 6.617GiB",
+      "ve-mysql\t1.06%\t649MiB / 6.617GiB",
+      "ve-mq\t0.68%\t233.1MiB / 6.617GiB"
+    ],
+    "label": "on-unique"
+  }
+]

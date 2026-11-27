@@ -37,6 +37,17 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 #    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 打印SQL，方便你观察缓存有没有穿透打到数据库
 
+seckill:
+  rate-limit:
+    # 压测开关：关闭后限流直接放行，用于「开启/关闭限流」两轮对照压测
+    enabled: true
+    # 用户级：容量 5，每秒补 2 个令牌（单个用户最多连抢 5 次，之后每 0.5s 一次）
+    user-capacity: 5
+    user-rate: 2
+    # 全局级：容量 1000，每秒补 400 个令牌（系统总闸门）
+    global-capacity: 1000
+    global-rate: 400
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%-5level] [%X{traceId:-NO_TRACE}] %logger{36} - %msg%n"

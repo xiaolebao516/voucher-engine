@@ -1,0 +1,298 @@
+[
+  {
+    "target_concurrency": 500,
+    "actual_requests": 600,
+    "client": "node",
+    "initial_stock": 5000,
+    "timestamp": "2026-11-27T21:29:28",
+    "elapsed_sec": 1.54,
+    "drain_sec": 8.57,
+    "http": {
+      "total": 600,
+      "success_200": 600,
+      "biz_rejected_200": 0,
+      "rate_limited_429": 0,
+      "unavailable_503": 0,
+      "error": 0
+    },
+    "rates": {
+      "request_qps": 389.62,
+      "success_qps": 389.62,
+      "rate_limited_pct": 0.0,
+      "error_pct": 0.0
+    },
+    "latency_ms": {
+      "p50": 835.9,
+      "p99": 1037.7
+    },
+    "orders_persisted": 600,
+    "order_throughput_qps": 59.35,
+    "db_stock_after": "4400",
+    "redis_stock_after": "4400",
+    "db_pool": {
+      "mysql_active_connections": 12
+    },
+    "mq_before": {
+      "order.create.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.dlq.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.timeout.dlq": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      }
+    },
+    "mq_after": {
+      "order.create.queue": {
+        "messages": 322,
+        "consumers": 1,
+        "ack_rate": 80.0
+      },
+      "order.dlq.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.timeout.dlq": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      }
+    },
+    "containers": [
+      "ve-redis\t3.76%\t15.19MiB / 6.617GiB",
+      "ve-mysql\t1.23%\t523.8MiB / 6.617GiB",
+      "ve-mq\t0.53%\t204.1MiB / 6.617GiB"
+    ],
+    "label": "on-unique"
+  },
+  {
+    "target_concurrency": 1000,
+    "actual_requests": 1200,
+    "client": "node",
+    "initial_stock": 5000,
+    "timestamp": "2026-11-27T21:29:59",
+    "elapsed_sec": 2.61,
+    "drain_sec": 14.13,
+    "http": {
+      "total": 1200,
+      "success_200": 1200,
+      "biz_rejected_200": 0,
+      "rate_limited_429": 0,
+      "unavailable_503": 0,
+      "error": 0
+    },
+    "rates": {
+      "request_qps": 459.58,
+      "success_qps": 459.58,
+      "rate_limited_pct": 0.0,
+      "error_pct": 0.0
+    },
+    "latency_ms": {
+      "p50": 1779.8,
+      "p99": 2125.4
+    },
+    "orders_persisted": 1200,
+    "order_throughput_qps": 71.67,
+    "db_stock_after": "3800",
+    "redis_stock_after": "3800",
+    "db_pool": {
+      "mysql_active_connections": 12
+    },
+    "mq_before": {
+      "order.create.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.dlq.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.timeout.dlq": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      }
+    },
+    "mq_after": {
+      "order.create.queue": {
+        "messages": 67,
+        "consumers": 1,
+        "ack_rate": 93.4
+      },
+      "order.dlq.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.timeout.dlq": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      }
+    },
+    "containers": [
+      "ve-redis\t3.94%\t14.16MiB / 6.617GiB",
+      "ve-mysql\t3.78%\t524.2MiB / 6.617GiB",
+      "ve-mq\t0.73%\t211.5MiB / 6.617GiB"
+    ],
+    "label": "on-unique"
+  },
+  {
+    "target_concurrency": 3000,
+    "actual_requests": 3600,
+    "client": "node",
+    "initial_stock": 5000,
+    "timestamp": "2026-11-27T21:30:50",
+    "elapsed_sec": 7.15,
+    "drain_sec": 29.47,
+    "http": {
+      "total": 3600,
+      "success_200": 2220,
+      "biz_rejected_200": 0,
+      "rate_limited_429": 1380,
+      "unavailable_503": 0,
+      "error": 0
+    },
+    "rates": {
+      "request_qps": 503.41,
+      "success_qps": 310.44,
+      "rate_limited_pct": 38.33,
+      "error_pct": 0.0
+    },
+    "latency_ms": {
+      "p50": 5518.5,
+      "p99": 6121.7
+    },
+    "orders_persisted": 2220,
+    "order_throughput_qps": 60.63,
+    "db_stock_after": "2780",
+    "redis_stock_after": "2780",
+    "db_pool": {
+      "mysql_active_connections": 12
+    },
+    "mq_before": {
+      "order.create.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.dlq.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.timeout.dlq": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      }
+    },
+    "mq_after": {
+      "order.create.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 19.4
+      },
+      "order.dlq.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.timeout.dlq": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      }
+    },
+    "containers": [
+      "ve-redis\t3.77%\t13.52MiB / 6.617GiB",
+      "ve-mysql\t1.94%\t525.9MiB / 6.617GiB",
+      "ve-mq\t1.79%\t212.4MiB / 6.617GiB"
+    ],
+    "label": "on-unique"
+  },
+  {
+    "target_concurrency": 5000,
+    "actual_requests": 6000,
+    "client": "node",
+    "initial_stock": 5000,
+    "timestamp": "2026-11-27T21:32:03",
+    "elapsed_sec": 14.96,
+    "drain_sec": 43.9,
+    "http": {
+      "total": 6000,
+      "success_200": 3240,
+      "biz_rejected_200": 0,
+      "rate_limited_429": 2760,
+      "unavailable_503": 0,
+      "error": 0
+    },
+    "rates": {
+      "request_qps": 401.18,
+      "success_qps": 216.64,
+      "rate_limited_pct": 46.0,
+      "error_pct": 0.0
+    },
+    "latency_ms": {
+      "p50": 13034.4,
+      "p99": 13643.8
+    },
+    "orders_persisted": 3240,
+    "order_throughput_qps": 55.05,
+    "db_stock_after": "1760",
+    "redis_stock_after": "1760",
+    "db_pool": {
+      "mysql_active_connections": 12
+    },
+    "mq_before": {
+      "order.create.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.dlq.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.timeout.dlq": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      }
+    },
+    "mq_after": {
+      "order.create.queue": {
+        "messages": 8,
+        "consumers": 1,
+        "ack_rate": 66.0
+      },
+      "order.dlq.queue": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      },
+      "order.timeout.dlq": {
+        "messages": 0,
+        "consumers": 1,
+        "ack_rate": 0.0
+      }
+    },
+    "containers": [
+      "ve-redis\t4.30%\t14MiB / 6.617GiB",
+      "ve-mysql\t2.66%\t530.9MiB / 6.617GiB",
+      "ve-mq\t1.81%\t220.7MiB / 6.617GiB"
+    ],
+    "label": "on-unique"
+  }
+]

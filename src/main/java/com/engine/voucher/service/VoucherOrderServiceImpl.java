@@ -7,6 +7,7 @@ import com.engine.voucher.config.RabbitMqConfig;
 import com.engine.voucher.constant.TraceConstant;
 import com.engine.voucher.entity.Voucher;
 import com.engine.voucher.entity.VoucherOrder;
+import com.engine.voucher.exception.RateLimitedException;
 import com.engine.voucher.mapper.VoucherMapper;
 import com.engine.voucher.mapper.VoucherOrderMapper;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private final RabbitTemplate rabbitTemplate;
     private final VoucherOrderMapper voucherOrderMapper;
     private final VoucherMapper voucherMapper;
+    private final RateLimiter rateLimiter;
 
 
     @Override
@@ -84,6 +86,17 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Override
     public String seckillByRedis(Long voucherId, Long userId) {
+        // 令牌桶限流：先扣用户桶，再扣全局桶。
+        // 正常限流抛 RateLimitedException(429)，Redis 故障抛 RateLimitUnavailableException(503)。
+        int tokenResult = rateLimiter.tryAcquire(userId);
+        if (tokenResult == RateLimiter.USER_DENIED) {
+            throw new RateLimitedException("用户请求过多，请稍后重试", "USER");
+        }
+        if (tokenResult == RateLimiter.GLOBAL_DENIED) {
+            throw new RateLimitedException("接口繁忙，请稍后重试", "GLOBAL");
+        }
+
+        // 继续执行库存预扣
         // 执行 Lua 脚本
         Long result = stringRedisTemplate.execute(SECKILL_SCRIPT,
                 Arrays.asList("seckill:stock:" + voucherId, "seckill:order:" + voucherId),
