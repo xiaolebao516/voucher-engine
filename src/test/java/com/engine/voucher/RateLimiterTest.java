@@ -257,35 +257,76 @@ class RateLimiterTest {
     @DisplayName("执行顺序：用户桶先于全局桶，用户桶拒绝时全局桶完全不被触碰")
     void testUserBucketCheckedBeforeGlobal() {
         Long user = newUser(50);
-        // 用户桶容量 0 必拒；全局桶容量给 100
-        int denied = rateLimiter.tryAcquire(user, 0, 1, 100, 1);
+        // 参数校验已禁止容量 0，这里改用合法参数把用户桶真正耗尽：
+        // 容量 1、速率 1/s，放行一次后桶空，毫秒级内补不满 1 个令牌。
+        rateLimiter.clearBuckets(user);
+
+        // 万一两次调用间隔超过 1s（极端调度延迟）令牌会补回并再次放行，
+        // 因此循环重试，并且每次都紧邻调用前重新取全局桶快照，
+        // 断言只针对「真正被用户桶拒绝的那一次」。
+        Double globalBefore = null;
+        int denied = RateLimiter.ALLOWED;
+        for (int attempt = 0; attempt < 10 && denied != RateLimiter.USER_DENIED; attempt++) {
+            globalBefore = globalTokens();
+            denied = rateLimiter.tryAcquire(user, 1, 1, 100, 1);
+        }
         Assertions.assertEquals(RateLimiter.USER_DENIED, denied, "用户桶应先拒绝");
 
         // 用户桶先返回，Lua 根本不会走到全局桶那一步，
-        // 所以全局 key 此时压根不存在（比「保持满桶」更强的结论）
-        Boolean globalExists = stringRedisTemplate.hasKey("rate:seckill:{limit}:global");
-        System.out.println("用户桶拒绝后，全局 key 是否存在 = " + globalExists);
-        Assertions.assertNotEquals(Boolean.TRUE, globalExists,
-                "用户桶拒绝时全局桶不应被创建，说明用户桶确实先于全局桶检查");
+        // 所以全局桶令牌数应保持该次调用前的值不变
+        // （比「保持满桶」更强的结论：证明全局桶这次完全没被触碰）
+        System.out.println("用户桶拒绝后，全局桶 tokens = " + globalTokens()
+                + "，拒绝前 = " + globalBefore);
+        Assertions.assertFalse(Double.isNaN(globalBefore), "被拒前全局桶应已存在");
+        Assertions.assertEquals(globalBefore, globalTokens(), 0.001,
+                "用户桶拒绝时全局桶不应被扣减，说明用户桶确实先于全局桶检查");
     }
 
     @Test
     @DisplayName("设计取舍：全局桶拒绝时用户桶已被扣减，不归还令牌")
     void testGlobalDeniedStillConsumesUserToken() {
         Long user = newUser(51);
-        // 全局桶容量 0 必拒
-        int r1 = rateLimiter.tryAcquire(user, 5, 1, 0, 1);
-        Assertions.assertEquals(RateLimiter.GLOBAL_DENIED, r1);
+        rateLimiter.clearBuckets(user);
 
-        Double userTokens = Double.parseDouble(String.valueOf(
-                stringRedisTemplate.opsForHash().get("rate:seckill:{limit}:user:" + user, "tokens")));
+        // 参数校验已禁止容量 0，这里改用合法参数把全局桶真正耗尽：
+        // 全局容量 1、速率 1/s，先由另一个用户吃干全局桶，
+        // 这样被测用户的用户桶仍有余额，只会在全局桶被拒。
+        Double userBefore = null;
+        int denied = RateLimiter.ALLOWED;
+        for (int attempt = 0; attempt < 10 && denied != RateLimiter.GLOBAL_DENIED; attempt++) {
+            // 每次用全新用户去吃全局桶，避免 other 自己的用户桶先耗尽
+            // （那样全局桶就不再被扣减，本轮会被误放行）。
+            Long eater = newUser(60 + attempt);
+            rateLimiter.clearBuckets(eater);
+            rateLimiter.tryAcquire(eater, 5, 1, 1, 1);
+            rateLimiter.tryAcquire(eater, 5, 1, 1, 1);
+            userBefore = userTokens(user);
+            denied = rateLimiter.tryAcquire(user, 5, 1, 1, 1);
+        }
+        Assertions.assertEquals(RateLimiter.GLOBAL_DENIED, denied, "全局桶应拒绝");
 
-        System.out.println("全局桶拒绝后，用户桶剩余 tokens = " + userTokens);
+        double userAfter = userTokens(user);
+        System.out.println("全局桶拒绝后，用户桶 tokens = " + userAfter
+                + "，拒绝前 = " + userBefore);
         // 有意为之的设计取舍：用户桶统计的是「这个用户打了多少次请求」，
         // 而不是「这个用户成功抢了几次」。请求打进来了就该计入频率，
         // 哪怕最终被全局限流挡掉 —— 否则用户会通过刷全局限流来「免费」试频率。
-        Assertions.assertEquals(4.0, userTokens, 0.001,
+        // 首次调用时用户桶按容量 5 初始化后扣 1 => 4；之后每次拒绝都只再扣 1。
+        double expected = userBefore == null || Double.isNaN(userBefore) ? 4.0 : userBefore - 1;
+        Assertions.assertEquals(expected, userAfter, 0.001,
                 "用户桶在全局拒绝后仍被扣减：这是按请求频率计数，属有意设计");
+    }
+
+    /** 读全局桶剩余令牌；key 不存在时返回 NaN，便于断言「完全未被触碰」 */
+    private double globalTokens() {
+        Object v = stringRedisTemplate.opsForHash().get("rate:seckill:{limit}:global", "tokens");
+        return v == null ? Double.NaN : Double.parseDouble(v.toString());
+    }
+
+    /** 读指定用户桶剩余令牌 */
+    private double userTokens(Long userId) {
+        Object v = stringRedisTemplate.opsForHash().get("rate:seckill:{limit}:user:" + userId, "tokens");
+        return v == null ? Double.NaN : Double.parseDouble(v.toString());
     }
 
     private static void sleep(long millis) {
