@@ -1,0 +1,33 @@
+{
+  "probe": "bench/probes/ab_deadlock.sh (同用户并发打 /seckill 与 /seckill-db)",
+  "rounds": 200,
+  "requests_per_round": 2,
+  "total_requests": 400,
+  "consumer_concurrency": 4,
+  "stock": 1000,
+  "results": [
+    {
+      "label": "OLD",
+      "jar": "3ec2b4c 状态（仅异步路径尾移，同步路径仍先扣库存）",
+      "status": {
+        "seckill_200": 200,
+        "seckill_db_200": 182,
+        "seckill_db_500": 18
+      },
+      "innodb_deadlocks_delta": 7,
+      "elapsed_sec": 4.4
+    },
+    {
+      "label": "FIXED",
+      "jar": "本次修复（同步路径也移到事务末尾）",
+      "status": {
+        "seckill_200": 200,
+        "seckill_db_200": 193,
+        "seckill_db_500": 7
+      },
+      "innodb_deadlocks_delta": 0,
+      "elapsed_sec": 4.3
+    }
+  ],
+  "note": "FIXED 的 7 个 500 全部是重复下单拒绝（每人限领一张），应用日志中 0 条 Deadlock；OLD 日志中 35 处 Deadlock/Lock wait timeout。"
+}

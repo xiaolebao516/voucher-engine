@@ -133,6 +133,17 @@ def tx_summary():
     return {"count": int(parts[0]), "sum_ns": int(parts[1]), "max_ns": int(parts[2])}
 
 
+def reset_tx_summary():
+    """清空事务汇总表，让 MAX_TIMER_READ_WRITE 变成「本轮内」的最大值。
+
+    该表是全局累计的，MAX 列是 MySQL 实例生命周期内的高水位，不随轮次重置；
+    之前几轮的死锁/锁等待探针留下的长事务会让后面所有轮次都读到同一个假值。
+    清空后 base 快照为 0，after 快照的 MAX 即本轮真实最大值。
+    """
+    gb.mysql("TRUNCATE TABLE "
+             "performance_schema.events_transactions_summary_global_by_event_name;")
+
+
 # 关键 SQL 的 digest 指纹。DIGEST_TEXT 里值被替换成 ?，可以直接按前缀匹配。
 KEY_STATEMENTS = {
     "deduct_stock": "UPDATE `tb_voucher` SET `stock` = `stock` - ? , `version` = `version` + ? WHERE `id` = ? AND `stock` > ?",
@@ -148,33 +159,43 @@ def stmt_digest():
     比事务汇总更适合定位瓶颈：事务汇总把每条 autocommit 语句也算一个事务，
     订单事务和 afterCommit 里的 markSent 混在一起，均值被稀释。
     performance_schema 的 TIMER_WAIT / LOCK_TIME 单位都是皮秒。
+
+    用 HEX(DIGEST) 作 key：DIGEST_TEXT 只是 SQL 模板的可读文本，不同模板的
+    前 60 字符可能完全相同（例如 INSERT 时非空列不同，列清单的差异在更后面），
+    若用截断文本作 key 会互相覆盖，导致整列统计变成 0。
     """
     out = gb.mysql(
-        "SELECT LEFT(DIGEST_TEXT,60), COUNT_STAR, SUM_TIMER_WAIT, MAX_TIMER_WAIT, "
+        "SELECT HEX(DIGEST), DIGEST_TEXT, COUNT_STAR, SUM_TIMER_WAIT, MAX_TIMER_WAIT, "
         "SUM_LOCK_TIME, SUM_ROWS_AFFECTED "
         "FROM performance_schema.events_statements_summary_by_digest "
         "WHERE SCHEMA_NAME='voucher_engine'")
     rows = {}
     for line in out.splitlines():
         parts = line.split("\t")
-        if len(parts) < 6:
+        if len(parts) < 7:
             continue
-        text, cnt, sum_ns, max_ns, lock_ns, rows_aff = parts[:6]
+        digest, text, cnt, sum_ns, max_ns, lock_ns, rows_aff = parts[:7]
         # MAX_TIMER_WAIT 是无符号列，MySQL 里存在下溢时会出现 2^64 量级的假值
         mx = int(max_ns)
-        rows[text] = {"count": int(cnt), "sum_ns": int(sum_ns),
-                      "max_ns": mx if mx < 2 ** 63 else None,
-                      "lock_ns": int(lock_ns),
-                      "rows_affected": int(rows_aff)}
+        rows[digest] = {"text": text, "count": int(cnt), "sum_ns": int(sum_ns),
+                        "max_ns": mx if mx < 2 ** 63 else None,
+                        "lock_ns": int(lock_ns),
+                        "rows_affected": int(rows_aff)}
     return rows
 
 
 def match_stmt(snapshot_rows, key):
-    prefix = KEY_STATEMENTS[key]
-    for text, v in snapshot_rows.items():
-        if text.startswith(prefix[:55]):
-            return v
-    return None
+    """按 SQL 模板前缀取语句统计。
+
+    同一条业务 SQL 可能有多条 digest：列组合不同（字段为 null 时 MyBatis-Plus
+    会少拼列）或探针脚本手写的精简语句，都会各占一行。必须取 COUNT_STAR
+    最大的主变体，否则会随机命中探针留下的个位数行。
+    """
+    prefix = KEY_STATEMENTS[key][:55]
+    hits = [v for v in snapshot_rows.values() if v["text"].startswith(prefix)]
+    if not hits:
+        return None
+    return max(hits, key=lambda v: v["count"])
 
 
 def active_db_conns():
@@ -257,6 +278,8 @@ def run_once(consumers, requests, stock):
     if q0[0] != 0 or q0[1] != 0:
         print(f"[warn] 起始队列非空 ready={q0[0]} unacked={q0[1]}", flush=True)
 
+    # 清空事务汇总，让本轮 tx_max_ms 是本轮真实最大值而非实例生命周期高水位。
+    reset_tx_summary()
     base = snapshot()
     orders0 = mysql_scalar("SELECT COUNT(*) FROM tb_voucher_order")
 

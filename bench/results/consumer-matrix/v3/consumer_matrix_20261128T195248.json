@@ -1,0 +1,556 @@
+{
+  "stock": 3000,
+  "requests": 3000,
+  "reps": 3,
+  "reports": [
+    {
+      "consumers": 1,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T19:41:18",
+      "inject_sec": 3.0,
+      "drain_sec": 32.67,
+      "total_sec": 35.67,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 84.1,
+      "drain_tps": 91.82,
+      "mq_peak_ready": 2727,
+      "mq_peak_unacked": 250,
+      "cpu_max_pct_all_cores": 31.62,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 3,
+      "mysql_threads_running_peak": 4,
+      "row_lock_waits_delta": 2,
+      "row_lock_time_ms_delta": 3,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 3000,
+          "avg_ms": 0.278,
+          "lock_ms": 5.0
+        },
+        "insert_order": {
+          "count": 3000,
+          "avg_ms": 0.256,
+          "lock_ms": 5.3
+        },
+        "insert_consume_log": {
+          "count": 3000,
+          "avg_ms": 0.308,
+          "lock_ms": 9.2
+        },
+        "insert_local_msg": {
+          "count": 3000,
+          "avg_ms": 0.273,
+          "lock_ms": 4.3
+        }
+      },
+      "tx_count_delta": 6047,
+      "tx_avg_ms": 5.939,
+      "tx_max_ms": 76.9,
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 1
+    },
+    {
+      "consumers": 1,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T19:42:55",
+      "inject_sec": 3.3,
+      "drain_sec": 32.6,
+      "total_sec": 35.9,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 83.57,
+      "drain_tps": 92.03,
+      "mq_peak_ready": 2744,
+      "mq_peak_unacked": 250,
+      "cpu_max_pct_all_cores": 34.61,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 3,
+      "mysql_threads_running_peak": 4,
+      "row_lock_waits_delta": 0,
+      "row_lock_time_ms_delta": 0,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 3000,
+          "avg_ms": 0.278,
+          "lock_ms": 4.4
+        },
+        "insert_order": {
+          "count": 3000,
+          "avg_ms": 0.249,
+          "lock_ms": 5.5
+        },
+        "insert_consume_log": {
+          "count": 3000,
+          "avg_ms": 0.327,
+          "lock_ms": 9.3
+        },
+        "insert_local_msg": {
+          "count": 3000,
+          "avg_ms": 0.295,
+          "lock_ms": 4.4
+        }
+      },
+      "tx_count_delta": 6043,
+      "tx_avg_ms": 5.951,
+      "tx_max_ms": 62.0,
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 2
+    },
+    {
+      "consumers": 1,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T19:44:32",
+      "inject_sec": 3.05,
+      "drain_sec": 32.58,
+      "total_sec": 35.63,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 84.21,
+      "drain_tps": 92.08,
+      "mq_peak_ready": 2706,
+      "mq_peak_unacked": 250,
+      "cpu_max_pct_all_cores": 28.01,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 3,
+      "mysql_threads_running_peak": 4,
+      "row_lock_waits_delta": 3,
+      "row_lock_time_ms_delta": 5,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 3000,
+          "avg_ms": 0.274,
+          "lock_ms": 4.9
+        },
+        "insert_order": {
+          "count": 3000,
+          "avg_ms": 0.253,
+          "lock_ms": 5.4
+        },
+        "insert_consume_log": {
+          "count": 3000,
+          "avg_ms": 0.316,
+          "lock_ms": 9.5
+        },
+        "insert_local_msg": {
+          "count": 3000,
+          "avg_ms": 0.281,
+          "lock_ms": 4.5
+        }
+      },
+      "tx_count_delta": 6052,
+      "tx_avg_ms": 5.99,
+      "tx_max_ms": 62.9,
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 3
+    },
+    {
+      "consumers": 2,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T19:45:52",
+      "inject_sec": 3.37,
+      "drain_sec": 17.58,
+      "total_sec": 20.95,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 143.2,
+      "drain_tps": 170.64,
+      "mq_peak_ready": 2619,
+      "mq_peak_unacked": 500,
+      "cpu_max_pct_all_cores": 28.46,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 4,
+      "mysql_threads_running_peak": 4,
+      "row_lock_waits_delta": 931,
+      "row_lock_time_ms_delta": 1349,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 3000,
+          "avg_ms": 0.748,
+          "lock_ms": 1307.0
+        },
+        "insert_order": {
+          "count": 3000,
+          "avg_ms": 0.258,
+          "lock_ms": 5.3
+        },
+        "insert_consume_log": {
+          "count": 2999,
+          "avg_ms": 0.319,
+          "lock_ms": 8.2
+        },
+        "insert_local_msg": {
+          "count": 2999,
+          "avg_ms": 0.34,
+          "lock_ms": 5.0
+        }
+      },
+      "tx_count_delta": 6044,
+      "tx_avg_ms": 7.611,
+      "tx_max_ms": 171.4,
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 1
+    },
+    {
+      "consumers": 2,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T19:47:26",
+      "inject_sec": 3.13,
+      "drain_sec": 19.78,
+      "total_sec": 22.91,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 130.96,
+      "drain_tps": 151.67,
+      "mq_peak_ready": 2586,
+      "mq_peak_unacked": 500,
+      "cpu_max_pct_all_cores": 35.39,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 4,
+      "mysql_threads_running_peak": 6,
+      "row_lock_waits_delta": 953,
+      "row_lock_time_ms_delta": 1237,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 3000,
+          "avg_ms": 0.742,
+          "lock_ms": 1239.6
+        },
+        "insert_order": {
+          "count": 2998,
+          "avg_ms": 0.278,
+          "lock_ms": 5.6
+        },
+        "insert_consume_log": {
+          "count": 2999,
+          "avg_ms": 0.317,
+          "lock_ms": 7.9
+        },
+        "insert_local_msg": {
+          "count": 2998,
+          "avg_ms": 0.328,
+          "lock_ms": 4.9
+        }
+      },
+      "tx_count_delta": 6040,
+      "tx_avg_ms": 7.537,
+      "tx_max_ms": 88.6,
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 2
+    },
+    {
+      "consumers": 2,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T19:48:48",
+      "inject_sec": 3.19,
+      "drain_sec": 19.76,
+      "total_sec": 22.95,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 130.7,
+      "drain_tps": 151.81,
+      "mq_peak_ready": 2566,
+      "mq_peak_unacked": 500,
+      "cpu_max_pct_all_cores": 32.21,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 3,
+      "mysql_threads_running_peak": 5,
+      "row_lock_waits_delta": 970,
+      "row_lock_time_ms_delta": 1282,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 3000,
+          "avg_ms": 0.748,
+          "lock_ms": 1287.0
+        },
+        "insert_order": {
+          "count": 3000,
+          "avg_ms": 0.273,
+          "lock_ms": 5.4
+        },
+        "insert_consume_log": {
+          "count": 3000,
+          "avg_ms": 0.308,
+          "lock_ms": 7.8
+        },
+        "insert_local_msg": {
+          "count": 2999,
+          "avg_ms": 0.329,
+          "lock_ms": 5.1
+        }
+      },
+      "tx_count_delta": 6033,
+      "tx_avg_ms": 7.448,
+      "tx_max_ms": 103.0,
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 3
+    },
+    {
+      "consumers": 4,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T19:50:08",
+      "inject_sec": 3.43,
+      "drain_sec": 17.58,
+      "total_sec": 21.01,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 142.82,
+      "drain_tps": 170.64,
+      "mq_peak_ready": 2472,
+      "mq_peak_unacked": 1000,
+      "cpu_max_pct_all_cores": 32.45,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 6,
+      "mysql_threads_running_peak": 8,
+      "row_lock_waits_delta": 2997,
+      "row_lock_time_ms_delta": 33547,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 3000,
+          "avg_ms": 11.556,
+          "lock_ms": 33550.0
+        },
+        "insert_order": {
+          "count": 3000,
+          "avg_ms": 0.291,
+          "lock_ms": 5.7
+        },
+        "insert_consume_log": {
+          "count": 2998,
+          "avg_ms": 0.315,
+          "lock_ms": 7.7
+        },
+        "insert_local_msg": {
+          "count": 2999,
+          "avg_ms": 0.339,
+          "lock_ms": 5.3
+        }
+      },
+      "tx_count_delta": 6040,
+      "tx_avg_ms": 13.544,
+      "tx_max_ms": 102.6,
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 1
+    },
+    {
+      "consumers": 4,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T19:51:28",
+      "inject_sec": 3.39,
+      "drain_sec": 17.57,
+      "total_sec": 20.95,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 143.17,
+      "drain_tps": 170.77,
+      "mq_peak_ready": 2484,
+      "mq_peak_unacked": 1000,
+      "cpu_max_pct_all_cores": 33.56,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 6,
+      "mysql_threads_running_peak": 7,
+      "row_lock_waits_delta": 2997,
+      "row_lock_time_ms_delta": 34623,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 3000,
+          "avg_ms": 11.916,
+          "lock_ms": 34623.6
+        },
+        "insert_order": {
+          "count": 2999,
+          "avg_ms": 0.276,
+          "lock_ms": 6.0
+        },
+        "insert_consume_log": {
+          "count": 2999,
+          "avg_ms": 0.31,
+          "lock_ms": 7.9
+        },
+        "insert_local_msg": {
+          "count": 2999,
+          "avg_ms": 0.358,
+          "lock_ms": 5.2
+        }
+      },
+      "tx_count_delta": 6040,
+      "tx_avg_ms": 13.843,
+      "tx_max_ms": 134.5,
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 2
+    },
+    {
+      "consumers": 4,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T19:52:48",
+      "inject_sec": 3.29,
+      "drain_sec": 17.56,
+      "total_sec": 20.85,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 143.87,
+      "drain_tps": 170.84,
+      "mq_peak_ready": 2471,
+      "mq_peak_unacked": 1000,
+      "cpu_max_pct_all_cores": 27.75,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 6,
+      "mysql_threads_running_peak": 7,
+      "row_lock_waits_delta": 2997,
+      "row_lock_time_ms_delta": 32750,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 3000,
+          "avg_ms": 11.289,
+          "lock_ms": 32713.8
+        },
+        "insert_order": {
+          "count": 2999,
+          "avg_ms": 0.274,
+          "lock_ms": 5.6
+        },
+        "insert_consume_log": {
+          "count": 3000,
+          "avg_ms": 0.335,
+          "lock_ms": 7.4
+        },
+        "insert_local_msg": {
+          "count": 3000,
+          "avg_ms": 0.33,
+          "lock_ms": 6.1
+        }
+      },
+      "tx_count_delta": 6042,
+      "tx_avg_ms": 13.405,
+      "tx_max_ms": 135.2,
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 3
+    }
+  ]
+}

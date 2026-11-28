@@ -21,6 +21,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -65,9 +66,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
          Long count = lambdaQuery().eq(VoucherOrder::getUserId, userId).eq(VoucherOrder::getVoucherId, voucherId).count();
         // 如果 count > 0，直接 return "每人限领一张，请勿重复抢购";
         if (count > 0) return "每人限领一张，请勿重复抢购";
-        // 调用 voucherMapper.deductStock(voucherId) 乐观锁扣减库存
-        int updated = voucherMapper.deductStock(voucherId);
-        if (updated == 0) return "手慢了，优惠券已抢光";
         // 创建订单并写入 tb_voucher_order 表
         VoucherOrder order = new VoucherOrder();
         order.setId(IdUtil.getSnowflakeNextId());
@@ -81,6 +79,16 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         catch (DuplicateKeyException e) {
             throw new RuntimeException("每人限领一张，请勿重复抢购");
          }
+        // 热点库存行放到事务最后更新，与异步消费者（OrderCreateConsumer）保持
+        // 同一加锁顺序：先 tb_voucher_order 唯一键、后 tb_voucher 热点行。
+        // 顺序不一致会与异步路径形成 ABBA 环，同用户同时打两个接口即死锁。
+        int updated = voucherMapper.deductStock(voucherId);
+        if (updated == 0) {
+            // 不能直接 return：订单已经插入，正常返回会提交出一个没扣到库存的订单。
+            // 标记回滚后返回文案，由事务拦截器统一回滚（不抛异常，保持原有返回契约）。
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return "手慢了，优惠券已抢光";
+        }
         return "抢券成功";
     }
 
