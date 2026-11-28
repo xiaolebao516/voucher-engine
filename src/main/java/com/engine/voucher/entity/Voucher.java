@@ -13,6 +13,7 @@ public class Voucher {
     private Long id;
     private String title;
     private Integer stock;
+    private Integer stockBucketCount;
     private Integer status;
     private LocalDateTime beginTime;
     private LocalDateTime endTime;

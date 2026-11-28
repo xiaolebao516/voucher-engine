@@ -5,6 +5,7 @@ import com.engine.voucher.entity.Voucher;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface VoucherMapper extends BaseMapper<Voucher> {
@@ -15,6 +16,9 @@ public interface VoucherMapper extends BaseMapper<Voucher> {
     // 注意 version 只在这里自增、从未出现在 WHERE 条件里，它不参与任何并发控制。
     @Update("UPDATE tb_voucher SET stock = stock - 1, version = version + 1 WHERE id = #{id} AND stock > 0")
     int deductStock(@Param("id") Long id);
+
+    @Select("SELECT stock_bucket_count FROM tb_voucher WHERE id = #{id}")
+    Integer selectStockBucketCount(@Param("id") Long id);
 
     @Update("UPDATE tb_voucher SET stock = stock + 1 WHERE id = #{id}")
     int refundStock(@Param("id") Long id);

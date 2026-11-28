@@ -7,9 +7,9 @@ import com.engine.voucher.constant.TraceConstant;
 import com.engine.voucher.entity.MqConsumeLog;
 import com.engine.voucher.entity.VoucherOrder;
 import com.engine.voucher.mapper.MqConsumeLogMapper;
-import com.engine.voucher.mapper.VoucherMapper;
 import com.engine.voucher.mapper.VoucherOrderMapper;
 import com.engine.voucher.service.LocalMessageService;
+import com.engine.voucher.service.StockBucketService;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -40,9 +39,8 @@ public class OrderCreateConsumer {
 
     private final MqConsumeLogMapper mqConsumeLogMapper;
     private final VoucherOrderMapper voucherOrderMapper;
-    private final VoucherMapper voucherMapper;
     private final RabbitTemplate rabbitTemplate;
-    private final TransactionTemplate transactionTemplate;
+    private final StockBucketService stockBucketService;
     private final StringRedisTemplate stringRedisTemplate;
     private final LocalMessageService localMessageService;
 
@@ -91,7 +89,7 @@ public class OrderCreateConsumer {
             }
 
             try {
-                TxResult txResult = transactionTemplate.execute(status -> {
+                TxResult txResult = stockBucketService.execute(voucherId, userId, (bucketId, status) -> {
                     MqConsumeLog mqConsumeLog = new MqConsumeLog();
                     mqConsumeLog.setMsgId(orderId.toString());
                     mqConsumeLog.setCreateTime(LocalDateTime.now());
@@ -106,6 +104,7 @@ public class OrderCreateConsumer {
                     voucherOrder.setId(orderId);
                     voucherOrder.setUserId(userId);
                     voucherOrder.setVoucherId(voucherId);
+                    voucherOrder.setStockBucketId(bucketId);
                     voucherOrder.setStatus(0);
                     voucherOrder.setCreateTime(LocalDateTime.now());
                     try {
@@ -125,10 +124,7 @@ public class OrderCreateConsumer {
 
                     // 将热点库存行的条件更新放在事务最后，减少持锁至提交的时间。
                     // 库存不足仍抛异常：订单、消费日志、本地消息一起回滚，afterCommit 不会执行。
-                    int updated = voucherMapper.deductStock(voucherId);
-                    if (updated == 0) {
-                        throw new IllegalStateException("数据库库存扣减失败，库存不足");
-                    }
+                    stockBucketService.deduct(voucherId, bucketId);
 
                     return TxResult.SUCCESS;
                 });

@@ -14,6 +14,8 @@ public class VoucherOrder {
     private Long id;
     private Long userId;
     private Long voucherId;
+    // null 表示旧版单行库存；否则记录实际扣减的桶（包括回退选中的桶）。
+    private Integer stockBucketId;
     // 状态机：0-待核销 1-锁定中 2-已核销 3-已过期退还
     private Integer status;
     private LocalDateTime createTime;

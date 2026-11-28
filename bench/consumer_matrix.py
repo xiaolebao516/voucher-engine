@@ -147,6 +147,7 @@ def reset_tx_summary():
 # 关键 SQL 的 digest 指纹。DIGEST_TEXT 里值被替换成 ?，可以直接按前缀匹配。
 KEY_STATEMENTS = {
     "deduct_stock": "UPDATE `tb_voucher` SET `stock` = `stock` - ? , `version` = `version` + ? WHERE `id` = ? AND `stock` > ?",
+    "deduct_bucket": "UPDATE `tb_voucher_stock_bucket` SET `stock` = `stock` - ?",
     "insert_order": "INSERT INTO `tb_voucher_order`",
     "insert_consume_log": "INSERT INTO `tb_mq_consume_log`",
     "insert_local_msg": "INSERT INTO `tb_local_message`",
@@ -250,7 +251,19 @@ def _drain_to_stable(timeout=300, need=5):
     return last_change
 
 
-def run_once(consumers, requests, stock):
+def reset_bucket_state(stock, buckets):
+    # 仅隔离压测库：在已排空、无外部流量时重置；原有 reset_state 本身会清理订单。
+    gb.reset_state(stock)
+    statements = ["START TRANSACTION", f"DELETE FROM tb_voucher_stock_bucket WHERE voucher_id={gb.VOUCHER_ID}",
+                  f"UPDATE tb_voucher SET stock_bucket_count={buckets}, stock={0 if buckets else stock} WHERE id={gb.VOUCHER_ID}"]
+    if buckets:
+        rows = ','.join(f'({gb.VOUCHER_ID},{i},{stock // buckets + (i < stock % buckets)})' for i in range(buckets))
+        statements.append("INSERT INTO tb_voucher_stock_bucket(voucher_id,bucket_id,stock) VALUES " + rows)
+    statements.append("COMMIT")
+    gb.mysql(';'.join(statements) + ';')
+
+
+def run_once(consumers, requests, stock, buckets=0):
     log_path = f"bench/logs/app-c{consumers}-{datetime.now():%H%M%S}.log"
     start_app(consumers, log_path)
     pid = app_pid()
@@ -258,13 +271,13 @@ def run_once(consumers, requests, stock):
     # 冷 JIT 预热：每轮都重启了应用，热点方法还没被 C2 编译，直接测会让
     # 首轮排空 TPS 偏低。先灌一小批并等排空，结果丢弃，再开始正式测量。
     warm = max(200, min(500, requests // 4))
-    gb.reset_state(stock)
+    reset_bucket_state(stock, buckets)
     subprocess.run(["node", "bench/load.js", "200", str(warm), "seckill"],
                    capture_output=True, timeout=600)
     _drain_to_stable(timeout=300)
     print(f"[warmup] 消费者={consumers} 预热 {warm} 单完成", flush=True)
 
-    gb.reset_state(stock)
+    reset_bucket_state(stock, buckets)
     # reset_state 不清理 order.delay.queue：上一轮积压的延迟消息 15 分钟后会
     # 转入 order.timeout.dlq 并触发退库存、把订单状态改成 3，跨轮污染库存校验。
     # 这里主动清空延迟队列与本地消息表。
@@ -339,7 +352,10 @@ def run_once(consumers, requests, stock):
     orders = mysql_scalar("SELECT COUNT(*) FROM tb_voucher_order") - orders0
 
     # ---- 一致性校验 ----
-    db_stock = mysql_scalar(f"SELECT stock FROM tb_voucher WHERE id={gb.VOUCHER_ID}")
+    db_stock = mysql_scalar(f"SELECT COALESCE(SUM(stock),0) FROM tb_voucher_stock_bucket WHERE voucher_id={gb.VOUCHER_ID}") if buckets else mysql_scalar(f"SELECT stock FROM tb_voucher WHERE id={gb.VOUCHER_ID}")
+    invalid_bucket_orders = mysql_scalar("SELECT COUNT(*) FROM tb_voucher_order o LEFT JOIN tb_voucher_stock_bucket b ON b.voucher_id=o.voucher_id AND b.bucket_id=o.stock_bucket_id WHERE o.stock_bucket_id IS NULL OR b.bucket_id IS NULL") if buckets else 0
+    negative_buckets = mysql_scalar(f"SELECT COUNT(*) FROM tb_voucher_stock_bucket WHERE voucher_id={gb.VOUCHER_ID} AND stock<0") if buckets else 0
+    bucket_rows = mysql_scalar(f"SELECT COUNT(*) FROM tb_voucher_stock_bucket WHERE voucher_id={gb.VOUCHER_ID}")
     redis_stock = int(gb.redis("GET", f"seckill:stock:{gb.VOUCHER_ID}"))
     distinct_users = mysql_scalar("SELECT COUNT(DISTINCT user_id) FROM tb_voucher_order")
     dup_pairs = mysql_scalar(
@@ -379,6 +395,7 @@ def run_once(consumers, requests, stock):
     total_time = inject_sec + drain_sec
     report = {
         "consumers": consumers,
+        "buckets": buckets,
         "requests": requests,
         "stock": stock,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -406,6 +423,10 @@ def run_once(consumers, requests, stock):
         "check": {
             "db_stock": db_stock,
             "redis_stock": redis_stock,
+            "bucket_rows": bucket_rows,
+            "invalid_bucket_orders": invalid_bucket_orders,
+            "negative_buckets": negative_buckets,
+            "bucket_integrity": bucket_rows == buckets and invalid_bucket_orders == 0 and negative_buckets == 0,
             "distinct_users": distinct_users,
             "duplicate_pairs": dup_pairs,
             "consume_log_rows": consume_log,
@@ -422,6 +443,8 @@ def run_once(consumers, requests, stock):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--consumers", default="1,2,4")
+    ap.add_argument("--buckets", type=int, choices=[0, 1, 4, 8, 16], default=0,
+                    help="0=旧库存行；1/4/8/16=分桶（仅隔离压测数据库）")
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--requests", type=int, default=3000)
     ap.add_argument("--stock", type=int, default=None,
@@ -438,7 +461,7 @@ def main():
         for rep in range(1, args.reps + 1):
             print(f"\n=== 消费者={c} 第{rep}/{args.reps}次 请求={args.requests} 库存={stock} ===",
                   flush=True)
-            r = run_once(c, args.requests, stock)
+            r = run_once(c, args.requests, stock, args.buckets)
             r["rep"] = rep
             all_reports.append(r)
             print(json.dumps({k: r[k] for k in
@@ -452,7 +475,7 @@ def main():
     ts = datetime.now().strftime("%Y%m%dT%H%M%S")
     out = os.path.join(args.out_dir, f"consumer_matrix_{ts}.json")
     with open(out, "w", encoding="utf-8") as f:
-        json.dump({"stock": stock, "requests": args.requests,
+        json.dump({"stock": stock, "requests": args.requests, "buckets": args.buckets,
                    "reps": args.reps, "reports": all_reports}, f,
                   ensure_ascii=False, indent=2)
     print(f"\n[written] {out}")

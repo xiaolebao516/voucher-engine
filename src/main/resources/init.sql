@@ -4,7 +4,8 @@ USE voucher_engine;
 CREATE TABLE `tb_voucher` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `title` VARCHAR(128) NOT NULL COMMENT '券名称',
-  `stock` INT NOT NULL COMMENT '剩余库存',
+  `stock` INT NOT NULL COMMENT '旧模式剩余库存；分桶模式不更新此行',
+  `stock_bucket_count` INT NOT NULL DEFAULT 0 COMMENT '0=旧库存行；1~64=分桶数量',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1-上架 2-下架',
   `begin_time` DATETIME NOT NULL COMMENT '抢购开始时间',
   `end_time` DATETIME NOT NULL COMMENT '抢购结束时间',
@@ -15,11 +16,20 @@ CREATE TABLE `tb_voucher` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='优惠券模板表';
 
+CREATE TABLE `tb_voucher_stock_bucket` (
+  `voucher_id` BIGINT NOT NULL,
+  `bucket_id` INT NOT NULL,
+  `stock` INT NOT NULL,
+  PRIMARY KEY (`voucher_id`, `bucket_id`),
+  CHECK (`stock` >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='优惠券分桶库存';
+
 -- 2. 用户抢券订单表
 CREATE TABLE `tb_voucher_order` (
   `id` BIGINT NOT NULL COMMENT '全局唯一订单ID(雪花算法/Redis生成，不用自增)',
   `user_id` BIGINT NOT NULL COMMENT '用户ID',
   `voucher_id` BIGINT NOT NULL COMMENT '优惠券ID',
+  `stock_bucket_id` INT NULL COMMENT '实际扣减桶，NULL 表示旧模式',
   `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态机：0-待核销 1-锁定中 2-已核销 3-已过期退还',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '抢券时间',
   `use_time` DATETIME NULL COMMENT '核销时间',

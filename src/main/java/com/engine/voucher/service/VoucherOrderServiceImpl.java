@@ -21,7 +21,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -51,45 +50,44 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private final VoucherOrderMapper voucherOrderMapper;
     private final VoucherMapper voucherMapper;
     private final RateLimiter rateLimiter;
+    private final StockBucketService stockBucketService;
 
 
     @Override
-    @Transactional(rollbackFor = Exception.class) // 保证“扣库存”和“创建订单”要么同时成功，要么同时回滚
     public String seckillByDb(Long voucherId, Long userId) {
-        // 校验优惠券是否存在、状态是否为上架(status == 1)、当前时间是否在 beginTime 和 endTime 之间
-        Voucher voucher = voucherMapper.selectById(voucherId);
-        if (voucher == null) return "优惠券不存在";
-        if (!Integer.valueOf(1).equals(voucher.getStatus())) return "优惠券未上架或已下架";
-        if (LocalDateTime.now().isAfter(voucher.getEndTime()) || LocalDateTime.now().isBefore(voucher.getBeginTime()))
-            return "不在抢购时间范围内";
-        // 校验“一人一单”（先在代码层拦一道，减少无效更新）
-         Long count = lambdaQuery().eq(VoucherOrder::getUserId, userId).eq(VoucherOrder::getVoucherId, voucherId).count();
-        // 如果 count > 0，直接 return "每人限领一张，请勿重复抢购";
-        if (count > 0) return "每人限领一张，请勿重复抢购";
-        // 创建订单并写入 tb_voucher_order 表
-        VoucherOrder order = new VoucherOrder();
-        order.setId(IdUtil.getSnowflakeNextId());
-        order.setVoucherId(voucherId);
-        order.setUserId(userId);
-        order.setCreateTime(LocalDateTime.now());
-        order.setStatus(0);
         try {
-            save(order);
-        }
-        catch (DuplicateKeyException e) {
-            throw new RuntimeException("每人限领一张，请勿重复抢购");
-         }
-        // 热点库存行放到事务最后更新，与异步消费者（OrderCreateConsumer）保持
-        // 同一加锁顺序：先 tb_voucher_order 唯一键、后 tb_voucher 热点行。
-        // 顺序不一致会与异步路径形成 ABBA 环，同用户同时打两个接口即死锁。
-        int updated = voucherMapper.deductStock(voucherId);
-        if (updated == 0) {
-            // 不能直接 return：订单已经插入，正常返回会提交出一个没扣到库存的订单。
-            // 标记回滚后返回文案，由事务拦截器统一回滚（不抛异常，保持原有返回契约）。
-            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return stockBucketService.execute(voucherId, userId, (bucketId, status) -> {
+                // 校验优惠券是否存在、状态是否为上架(status == 1)、当前时间是否在 beginTime 和 endTime 之间
+                Voucher voucher = voucherMapper.selectById(voucherId);
+                if (voucher == null) return "优惠券不存在";
+                if (!Integer.valueOf(1).equals(voucher.getStatus())) return "优惠券未上架或已下架";
+                if (LocalDateTime.now().isAfter(voucher.getEndTime()) || LocalDateTime.now().isBefore(voucher.getBeginTime()))
+                    return "不在抢购时间范围内";
+                // 校验“一人一单”（先在代码层拦一道，减少无效更新）
+                 Long count = lambdaQuery().eq(VoucherOrder::getUserId, userId).eq(VoucherOrder::getVoucherId, voucherId).count();
+                // 如果 count > 0，直接 return "每人限领一张，请勿重复抢购";
+                if (count > 0) return "每人限领一张，请勿重复抢购";
+                // 创建订单并写入 tb_voucher_order 表
+                VoucherOrder order = new VoucherOrder();
+                order.setId(IdUtil.getSnowflakeNextId());
+                order.setVoucherId(voucherId);
+                order.setStockBucketId(bucketId);
+                order.setUserId(userId);
+                order.setCreateTime(LocalDateTime.now());
+                order.setStatus(0);
+                try {
+                    save(order);
+                }
+                catch (DuplicateKeyException e) {
+                    throw new RuntimeException("每人限领一张，请勿重复抢购");
+                 }
+                // 与异步路径保持订单唯一键 -> 库存行的加锁顺序。
+                stockBucketService.deduct(voucherId, bucketId);
+                return "抢券成功";
+            });
+        } catch (StockBucketService.StockExhaustedException e) {
             return "手慢了，优惠券已抢光";
         }
-        return "抢券成功";
     }
 
     @Override
@@ -173,7 +171,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if (updated == 0) {
             return false; // 已经被核销或退过款了
         }
-        voucherMapper.refundStock(voucherId);
+        VoucherOrder order = voucherOrderMapper.selectById(orderId);
+        if (order == null || !voucherId.equals(order.getVoucherId())) {
+            throw new IllegalStateException("退库订单与优惠券不匹配");
+        }
+        stockBucketService.refund(voucherId, order.getStockBucketId());
         return true;
     }
 }

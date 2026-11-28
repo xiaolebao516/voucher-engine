@@ -29,6 +29,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
 
     private final StringRedisTemplate stringRedisTemplate;
     private final RedissonClient redissonClient;
+    private final StockBucketService stockBucketService;
     private RBloomFilter<Long> bloomFilter;
 
     // 记录当前正在排队或重建中的券 ID
@@ -64,6 +65,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         if (voucher == null || !Integer.valueOf(1).equals(voucher.getStatus())) {
             return;
         }
+        stockBucketService.applyStock(voucher);
         RedisData redisData = new RedisData();
         redisData.setData(voucher);
         redisData.setExpireTime(LocalDateTime.now().plusMinutes(30));
@@ -78,6 +80,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         if (voucher == null || voucher.getId() == null) {
             return;
         }
+        stockBucketService.applyStock(voucher);
         RedisData redisData = new RedisData();
         redisData.setData(voucher);
         redisData.setExpireTime(LocalDateTime.now().plusMinutes(30));
@@ -95,6 +98,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
             // 删key后，下架了查为Absent不能set覆盖，如果用空串防不住，我们query有对blank返回null兜底所以可以直接del
             return;
         }
+        stockBucketService.applyStock(voucher);
         RedisData redisData = new RedisData();
         redisData.setData(voucher);
         redisData.setExpireTime(LocalDateTime.now().plusMinutes(30));
