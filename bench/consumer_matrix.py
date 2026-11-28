@@ -149,6 +149,9 @@ KEY_STATEMENTS = {
     "deduct_stock": "UPDATE `tb_voucher` SET `stock` = `stock` - ? , `version` = `version` + ? WHERE `id` = ? AND `stock` > ?",
     "deduct_bucket": "UPDATE `tb_voucher_stock_bucket` SET `stock` = `stock` - ?",
     "insert_order": "INSERT INTO `tb_voucher_order`",
+    # 分桶模式订单多一列 stock_bucket_id，与旧模板前缀相同、只在列清单尾部不同。
+    # 必须用更长的前缀区分，否则 match_stmt 会选到历史计数最大的旧模板而恒为 0。
+    "insert_order_bucket": "INSERT INTO `tb_voucher_order` ( `id` , `user_id` , `voucher_id` , `stock_bucket_id`",
     "insert_consume_log": "INSERT INTO `tb_mq_consume_log`",
     "insert_local_msg": "INSERT INTO `tb_local_message`",
 }
@@ -166,10 +169,11 @@ def stmt_digest():
     若用截断文本作 key 会互相覆盖，导致整列统计变成 0。
     """
     out = gb.mysql(
-        "SELECT HEX(DIGEST), DIGEST_TEXT, COUNT_STAR, SUM_TIMER_WAIT, MAX_TIMER_WAIT, "
-        "SUM_LOCK_TIME, SUM_ROWS_AFFECTED "
+        "SELECT HEX(DIGEST), ANY_VALUE(DIGEST_TEXT), SUM(COUNT_STAR), "
+        "SUM(SUM_TIMER_WAIT), MAX(MAX_TIMER_WAIT), SUM(SUM_LOCK_TIME), "
+        "SUM(SUM_ROWS_AFFECTED) "
         "FROM performance_schema.events_statements_summary_by_digest "
-        "WHERE SCHEMA_NAME='voucher_engine'")
+        "WHERE SCHEMA_NAME='voucher_engine' GROUP BY DIGEST")
     rows = {}
     for line in out.splitlines():
         parts = line.split("\t")
@@ -192,7 +196,9 @@ def match_stmt(snapshot_rows, key):
     会少拼列）或探针脚本手写的精简语句，都会各占一行。必须取 COUNT_STAR
     最大的主变体，否则会随机命中探针留下的个位数行。
     """
-    prefix = KEY_STATEMENTS[key][:55]
+    # 用完整模板前缀匹配：不再截到 55 字符，否则形如 stock_bucket_id 的尾部区分点
+    # 会被抹掉，导致分桶订单模板和旧订单模板互相串号。
+    prefix = KEY_STATEMENTS[key]
     hits = [v for v in snapshot_rows.values() if v["text"].startswith(prefix)]
     if not hits:
         return None
@@ -335,6 +341,7 @@ def run_once(consumers, requests, stock, buckets=0):
 
     # ---- 排空：订单数连续 5 次不变 ----
     drain_start = time.time()
+    orders_at_drain_start = mysql_scalar("SELECT COUNT(*) FROM tb_voucher_order")
     last, stable, last_change = -1, 0, drain_start
     deadline = time.time() + 600
     while time.time() < deadline:
@@ -350,6 +357,9 @@ def run_once(consumers, requests, stock, buckets=0):
     th.join(timeout=10)
     drain_sec = max(last_change - drain_start, 0)
     orders = mysql_scalar("SELECT COUNT(*) FROM tb_voucher_order") - orders0
+    # 纯消费者排空 TPS：只算注入结束后新增的落库量，剔除注入期已落库部分。
+    drained_orders = mysql_scalar("SELECT COUNT(*) FROM tb_voucher_order") - orders_at_drain_start
+    drain_only_tps = round(drained_orders / drain_sec, 2) if drain_sec else None
 
     # ---- 一致性校验 ----
     db_stock = mysql_scalar(f"SELECT COALESCE(SUM(stock),0) FROM tb_voucher_stock_bucket WHERE voucher_id={gb.VOUCHER_ID}") if buckets else mysql_scalar(f"SELECT stock FROM tb_voucher WHERE id={gb.VOUCHER_ID}")
@@ -392,6 +402,35 @@ def run_once(consumers, requests, stock, buckets=0):
             "lock_ms": round((a["lock_ns"] - b["lock_ns"]) / 1e9, 1),
         }
 
+    # ---- 桶间库存分布与回退重试开销 ----
+    # 每桶剩余量与每桶落单量，用于观察 floorMod 首选桶是否偏斜。
+    bucket_dist = None
+    fallback = None
+    if buckets:
+        dist_rows = gb.mysql(
+            f"SELECT b.bucket_id, b.stock, COALESCE(o.cnt,0) FROM "
+            f"(SELECT bucket_id, stock FROM tb_voucher_stock_bucket WHERE voucher_id={gb.VOUCHER_ID}) b "
+            f"LEFT JOIN (SELECT stock_bucket_id, COUNT(*) cnt FROM tb_voucher_order "
+            f"WHERE voucher_id={gb.VOUCHER_ID} GROUP BY stock_bucket_id) o "
+            f"ON o.stock_bucket_id=b.bucket_id ORDER BY b.bucket_id").splitlines()
+        bucket_dist = [{"bucket": int(r.split("\t")[0]), "remaining": int(r.split("\t")[1]),
+                        "orders": int(r.split("\t")[2])} for r in dist_rows if r.strip()]
+        # deduct_bucket 执行次数 / 落库单数 = 平均每单尝试桶次数。
+        # 1.0 表示零回退；>1 即首选桶被撞空、整笔回滚换桶的开销。
+        # 注意 performance_schema 在高并发下会少计，该比值只作趋势参考，
+        # 精确回退量以 fallback_orders_db（DB 侧订单落桶与首选桶比对）为准。
+        attempts = (stmt_stats.get("deduct_bucket") or {}).get("count") or 0
+        fallback_orders_db = mysql_scalar(
+            f"SELECT COUNT(*) FROM tb_voucher_order WHERE voucher_id={gb.VOUCHER_ID} "
+            f"AND stock_bucket_id IS NOT NULL AND stock_bucket_id <> MOD(user_id, {buckets})")
+        fallback = {
+            "deduct_bucket_attempts": attempts,
+            "orders": orders,
+            "attempts_per_order": round(attempts / orders, 4) if orders else None,
+            "deduct_bucket_lock_ms": (stmt_stats.get("deduct_bucket") or {}).get("lock_ms"),
+            "fallback_orders_db": fallback_orders_db,
+        }
+
     total_time = inject_sec + drain_sec
     report = {
         "consumers": consumers,
@@ -407,6 +446,8 @@ def run_once(consumers, requests, stock, buckets=0):
         "orders_persisted": orders,
         "order_throughput_qps": round(orders / total_time, 2) if total_time else 0,
         "drain_tps": round(orders / drain_sec, 2) if drain_sec else None,
+        "drained_orders": drained_orders,
+        "drain_only_tps": drain_only_tps,
         "mq_peak_ready": peak["ready"],
         "mq_peak_unacked": peak["unacked"],
         "cpu_max_pct_all_cores": round(peak["cpu"], 2),
@@ -419,6 +460,8 @@ def run_once(consumers, requests, stock, buckets=0):
         "tx_count_delta": tx_cnt,
         "tx_avg_ms": avg_tx_ms,
         "tx_max_ms": max_tx_ms,
+        "bucket_dist": bucket_dist,
+        "fallback": fallback,
         # ---- 一致性校验 ----
         "check": {
             "db_stock": db_stock,
@@ -467,9 +510,11 @@ def main():
             print(json.dumps({k: r[k] for k in
                               ("consumers", "rep", "inject_sec", "drain_sec",
                                "orders_persisted", "order_throughput_qps", "drain_tps",
+                               "drained_orders", "drain_only_tps",
                                "mq_peak_ready", "row_lock_waits_delta", "tx_avg_ms",
                                "cpu_max_pct_all_cores", "db_conns_peak",
-                               "db_busy_conns_peak", "stmt_stats", "check")},
+                               "db_busy_conns_peak", "stmt_stats", "bucket_dist",
+                               "fallback", "check")},
                              ensure_ascii=False), flush=True)
 
     ts = datetime.now().strftime("%Y%m%dT%H%M%S")

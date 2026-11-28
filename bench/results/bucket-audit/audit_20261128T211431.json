@@ -1,0 +1,41 @@
+{
+  "1_异步换桶回滚": {
+    "orders": 1,
+    "order_bucket": 1,
+    "consume_logs": 1,
+    "outbox": 1,
+    "bucket_stocks": "0\t0\n1\t1\n2\t0\n3\t0",
+    "pass": true
+  },
+  "2_并发售罄": {
+    "success": 3,
+    "orders": 3,
+    "remaining": 0,
+    "negative": 0,
+    "codes": [
+      200
+    ],
+    "pass": true
+  },
+  "3_重复消费": {
+    "after_first": 1,
+    "orders": 1,
+    "consume_logs": 1,
+    "pass": true
+  },
+  "4_混合死锁": {
+    "deadlocks_delta": 0,
+    "codes": {
+      "200": 219,
+      "500": 21
+    },
+    "pass": true
+  },
+  "5_缓存聚合": {
+    "db_sum_before": 8,
+    "raw_stock": 0,
+    "db_sum_after": 6,
+    "raw_after": 0,
+    "pass": true
+  }
+}
