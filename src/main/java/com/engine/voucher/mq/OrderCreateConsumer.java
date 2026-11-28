@@ -102,11 +102,6 @@ public class OrderCreateConsumer {
                         return TxResult.DUPLICATE_MSG;
                     }
 
-                    int updated = voucherMapper.deductStock(voucherId);
-                    if (updated == 0) {
-                        throw new IllegalStateException("数据库库存扣减失败，库存不足");
-                    }
-
                     VoucherOrder voucherOrder = new VoucherOrder();
                     voucherOrder.setId(orderId);
                     voucherOrder.setUserId(userId);
@@ -127,6 +122,13 @@ public class OrderCreateConsumer {
                             ORDER_DELAY_ROUTING_KEY,
                             orderId.toString()
                     );
+
+                    // 将热点库存行的条件更新放在事务最后，减少持锁至提交的时间。
+                    // 库存不足仍抛异常：订单、消费日志、本地消息一起回滚，afterCommit 不会执行。
+                    int updated = voucherMapper.deductStock(voucherId);
+                    if (updated == 0) {
+                        throw new IllegalStateException("数据库库存扣减失败，库存不足");
+                    }
 
                     return TxResult.SUCCESS;
                 });
