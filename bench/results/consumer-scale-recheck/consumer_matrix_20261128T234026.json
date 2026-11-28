@@ -1,0 +1,537 @@
+{
+  "stock": 3000,
+  "requests": 3000,
+  "buckets": 16,
+  "reps": 3,
+  "pool": null,
+  "reports": [
+    {
+      "consumers": 16,
+      "buckets": 16,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T23:36:58",
+      "inject_sec": 5.79,
+      "drain_sec": 17.96,
+      "total_sec": 23.75,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 126.31,
+      "drain_tps": 167.05,
+      "drained_orders": 2673,
+      "drain_only_tps": 148.85,
+      "mq_peak_ready": 2775,
+      "mq_peak_unacked": 2775,
+      "cpu_max_pct_all_cores": 32.09,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 11,
+      "mysql_threads_running_peak": 11,
+      "mysql_cpu_ms": 29700.3,
+      "mysql_io_read_mb": 0.0,
+      "mysql_io_write_mb": 134.57,
+      "mysql_io_read_ops": 0,
+      "mysql_io_write_ops": 14230,
+      "pool_size": null,
+      "pool_borrow_n": 8850,
+      "pool_borrow_ms": 405601.09,
+      "pool_borrow_max_ms": 365.0,
+      "row_lock_waits_delta": 448,
+      "row_lock_time_ms_delta": 6320,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 0,
+          "avg_ms": null,
+          "lock_ms": 0.0
+        },
+        "deduct_bucket": {
+          "count": 2942,
+          "avg_ms": 2.617,
+          "lock_ms": 6254.6
+        },
+        "insert_order": {
+          "count": 0,
+          "avg_ms": null,
+          "lock_ms": 0.0
+        },
+        "insert_order_bucket": {
+          "count": 2942,
+          "avg_ms": 0.55,
+          "lock_ms": 8.1
+        },
+        "insert_consume_log": {
+          "count": 2950,
+          "avg_ms": 0.627,
+          "lock_ms": 11.6
+        },
+        "insert_local_msg": {
+          "count": 2935,
+          "avg_ms": 1.065,
+          "lock_ms": 7.5
+        }
+      },
+      "tx_count_delta": 9087,
+      "tx_avg_ms": 17.407,
+      "tx_max_ms": 242.7,
+      "bucket_dist": [
+        {
+          "bucket": 0,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 1,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 2,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 3,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 4,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 5,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 6,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 7,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 8,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 9,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 10,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 11,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 12,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 13,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 14,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 15,
+          "remaining": 0,
+          "orders": 187
+        }
+      ],
+      "fallback": {
+        "deduct_bucket_attempts": 2942,
+        "orders": 3000,
+        "attempts_per_order": 0.9807,
+        "deduct_bucket_lock_ms": 6254.6,
+        "fallback_orders_db": 0
+      },
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "bucket_rows": 16,
+        "invalid_bucket_orders": 0,
+        "negative_buckets": 0,
+        "bucket_integrity": true,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 1
+    },
+    {
+      "consumers": 16,
+      "buckets": 16,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T23:38:40",
+      "inject_sec": 6.53,
+      "drain_sec": 17.56,
+      "total_sec": 24.09,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 124.51,
+      "drain_tps": 170.82,
+      "drained_orders": 2559,
+      "drain_only_tps": 145.71,
+      "mq_peak_ready": 2278,
+      "mq_peak_unacked": 2278,
+      "cpu_max_pct_all_cores": 30.57,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 10,
+      "mysql_threads_running_peak": 12,
+      "mysql_cpu_ms": 31433.6,
+      "mysql_io_read_mb": 0.0,
+      "mysql_io_write_mb": 120.42,
+      "mysql_io_read_ops": 0,
+      "mysql_io_write_ops": 13286,
+      "pool_size": null,
+      "pool_borrow_n": 8764,
+      "pool_borrow_ms": 403168.7,
+      "pool_borrow_max_ms": 299.0,
+      "row_lock_waits_delta": 464,
+      "row_lock_time_ms_delta": 6755,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 0,
+          "avg_ms": null,
+          "lock_ms": 0.0
+        },
+        "deduct_bucket": {
+          "count": 2943,
+          "avg_ms": 2.785,
+          "lock_ms": 6738.1
+        },
+        "insert_order": {
+          "count": 0,
+          "avg_ms": null,
+          "lock_ms": 0.0
+        },
+        "insert_order_bucket": {
+          "count": 2938,
+          "avg_ms": 0.89,
+          "lock_ms": 10.6
+        },
+        "insert_consume_log": {
+          "count": 2930,
+          "avg_ms": 0.635,
+          "lock_ms": 10.4
+        },
+        "insert_local_msg": {
+          "count": 2916,
+          "avg_ms": 0.973,
+          "lock_ms": 7.1
+        }
+      },
+      "tx_count_delta": 9079,
+      "tx_avg_ms": 18.561,
+      "tx_max_ms": 383.6,
+      "bucket_dist": [
+        {
+          "bucket": 0,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 1,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 2,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 3,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 4,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 5,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 6,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 7,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 8,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 9,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 10,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 11,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 12,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 13,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 14,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 15,
+          "remaining": 0,
+          "orders": 187
+        }
+      ],
+      "fallback": {
+        "deduct_bucket_attempts": 2943,
+        "orders": 3000,
+        "attempts_per_order": 0.981,
+        "deduct_bucket_lock_ms": 6738.1,
+        "fallback_orders_db": 0
+      },
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "bucket_rows": 16,
+        "invalid_bucket_orders": 0,
+        "negative_buckets": 0,
+        "bucket_integrity": true,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 2
+    },
+    {
+      "consumers": 16,
+      "buckets": 16,
+      "requests": 3000,
+      "stock": 3000,
+      "timestamp": "2026-11-28T23:40:26",
+      "inject_sec": 5.57,
+      "drain_sec": 14.92,
+      "total_sec": 20.49,
+      "http_cats": {
+        "success": 3000
+      },
+      "http_success": 3000,
+      "orders_persisted": 3000,
+      "order_throughput_qps": 146.42,
+      "drain_tps": 201.05,
+      "drained_orders": 2756,
+      "drain_only_tps": 184.7,
+      "mq_peak_ready": 2815,
+      "mq_peak_unacked": 2815,
+      "cpu_max_pct_all_cores": 31.34,
+      "db_conns_peak": 11,
+      "db_busy_conns_peak": 10,
+      "mysql_threads_running_peak": 9,
+      "mysql_cpu_ms": 27293.4,
+      "mysql_io_read_mb": 0.0,
+      "mysql_io_write_mb": 120.99,
+      "mysql_io_read_ops": 0,
+      "mysql_io_write_ops": 14437,
+      "pool_size": null,
+      "pool_borrow_n": 8759,
+      "pool_borrow_ms": 344042.21,
+      "pool_borrow_max_ms": 510.0,
+      "row_lock_waits_delta": 467,
+      "row_lock_time_ms_delta": 4788,
+      "stmt_stats": {
+        "deduct_stock": {
+          "count": 0,
+          "avg_ms": null,
+          "lock_ms": 0.0
+        },
+        "deduct_bucket": {
+          "count": 2958,
+          "avg_ms": 2.061,
+          "lock_ms": 4748.5
+        },
+        "insert_order": {
+          "count": 0,
+          "avg_ms": null,
+          "lock_ms": 0.0
+        },
+        "insert_order_bucket": {
+          "count": 2946,
+          "avg_ms": 0.503,
+          "lock_ms": 7.5
+        },
+        "insert_consume_log": {
+          "count": 2936,
+          "avg_ms": 0.486,
+          "lock_ms": 10.4
+        },
+        "insert_local_msg": {
+          "count": 2940,
+          "avg_ms": 0.872,
+          "lock_ms": 7.3
+        }
+      },
+      "tx_count_delta": 9079,
+      "tx_avg_ms": 15.257,
+      "tx_max_ms": 322.8,
+      "bucket_dist": [
+        {
+          "bucket": 0,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 1,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 2,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 3,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 4,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 5,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 6,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 7,
+          "remaining": 0,
+          "orders": 188
+        },
+        {
+          "bucket": 8,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 9,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 10,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 11,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 12,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 13,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 14,
+          "remaining": 0,
+          "orders": 187
+        },
+        {
+          "bucket": 15,
+          "remaining": 0,
+          "orders": 187
+        }
+      ],
+      "fallback": {
+        "deduct_bucket_attempts": 2958,
+        "orders": 3000,
+        "attempts_per_order": 0.986,
+        "deduct_bucket_lock_ms": 4748.5,
+        "fallback_orders_db": 0
+      },
+      "check": {
+        "db_stock": 0,
+        "redis_stock": 0,
+        "bucket_rows": 16,
+        "invalid_bucket_orders": 0,
+        "negative_buckets": 0,
+        "bucket_integrity": true,
+        "distinct_users": 3000,
+        "duplicate_pairs": 0,
+        "consume_log_rows": 3000,
+        "expected_stock": 0,
+        "no_oversell": true,
+        "no_duplicate_orders": true,
+        "no_lost_orders": true
+      },
+      "rep": 3
+    }
+  ]
+}

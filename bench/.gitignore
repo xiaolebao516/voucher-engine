@@ -2,3 +2,5 @@ __pycache__/
 app.pid
 logs/
 .matrix.lock/
+# JFR 原始录制每份 3~5MB，仅本机分析用；保留 pool.jfc 配置以便复现
+jfr/*.jfr

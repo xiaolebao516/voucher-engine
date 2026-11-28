@@ -63,14 +63,19 @@ def _port_alive():
         return False
 
 
-def start_app(consumers, log_path):
+def start_app(consumers, log_path, pool=None):
     kill_app()
     time.sleep(2)
     log = open(log_path, "w", encoding="utf-8")
+    args = ["java", "-jar", JAR,
+            "--seckill.rate-limit.enabled=false",
+            f"--seckill.order-consumer.concurrency={consumers}"]
+    # 只在该组需要时覆盖连接池；默认不传，保持 Spring Boot 默认值（10），
+    # 这样「消费者数」与「池容量」两个变量不会同时变化。
+    if pool is not None:
+        args.append(f"--spring.datasource.hikari.maximum-pool-size={pool}")
     subprocess.Popen(
-        ["java", "-jar", JAR,
-         "--seckill.rate-limit.enabled=false",
-         f"--seckill.order-consumer.concurrency={consumers}"],
+        args,
         stdout=log, stderr=subprocess.STDOUT,
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
     for i in range(90):
@@ -218,6 +223,90 @@ def busy_db_conns():
         "WHERE DB='voucher_engine' AND COMMAND<>'Sleep'")
 
 
+def mysql_container_cpu_usec():
+    """MySQL 容器累计 CPU 微秒（cgroup v2）。容器 CPU 才反映 DB 真实开销，
+    宿主机上 python/powershell 的采样开销不计入。"""
+    out = subprocess.run(
+        ["docker", "exec", "ve-mysql", "sh", "-c", "cat /sys/fs/cgroup/cpu.stat"],
+        capture_output=True, text=True)
+    for line in out.stdout.splitlines():
+        if line.startswith("usage_usec"):
+            return int(line.split()[1])
+    return None
+
+
+def mysql_container_io():
+    """MySQL 容器累计磁盘 IO（cgroup v2 io.stat），返回 (读字节, 写字节, 读次数, 写次数)。
+
+    容器内的 /proc/diskstats 是宿主机视角、无法归属到 MySQL；io.stat 才是
+    该容器自己的块设备计数。
+    """
+    out = subprocess.run(
+        ["docker", "exec", "ve-mysql", "sh", "-c", "cat /sys/fs/cgroup/io.stat"],
+        capture_output=True, text=True)
+    rbytes = wbytes = rios = wios = 0
+    for line in out.stdout.splitlines():
+        for kv in line.split()[1:]:
+            k, _, v = kv.partition("=")
+            if k == "rbytes":
+                rbytes += int(v)
+            elif k == "wbytes":
+                wbytes += int(v)
+            elif k == "rios":
+                rios += int(v)
+            elif k == "wios":
+                wios += int(v)
+    return rbytes, wbytes, rios, wios
+
+
+JFR_SETTINGS = os.path.join("bench", "jfr", "pool.jfc")
+
+
+def jfr_start(pid, name="bench"):
+    """启动 JFR 录制，返回 (录制名, Windows 路径)。
+
+    必须把录制名回传给 jfr_stop：JFR 按 name 停止，名字对不上会停错对象，
+    文件留成 0 字节，解析时 borrow 恒为 0——看起来像「没有池等待」的假数据。
+    """
+    path = subprocess.run(["cygpath", "-w", f"bench/jfr/{name}.jfr"],
+                          capture_output=True, text=True).stdout.strip()
+    settings = subprocess.run(["cygpath", "-w", JFR_SETTINGS],
+                              capture_output=True, text=True).stdout.strip()
+    subprocess.run(["jcmd", str(pid), "JFR.start", f"name={name}",
+                    f"settings={settings}", f"filename={path}"],
+                   capture_output=True)
+    return name, path
+
+
+def jfr_stop(pid, name, path):
+    subprocess.run(["jcmd", str(pid), "JFR.stop", f"name={name}"],
+                   capture_output=True)
+    # 落盘是异步的，等文件真正有内容再返回，避免解析到半截文件。
+    for _ in range(50):
+        if os.path.exists(path) and os.path.getsize(path) > 0:
+            break
+        time.sleep(0.2)
+    return path
+
+
+def pool_wait_from_jfr(path):
+    """从 JFR 提取 Hikari 取连接阻塞的次数与累计时长。
+
+    项目无 actuator，池内指标不可见；线程栈采样又会触发 safepoint 干扰吞吐。
+    JFR 按事件记录 ThreadPark 并带完整栈，据此区分 borrow（等不到连接）与
+    requite（归还），只有 borrow 代表消费者被池容量卡住。
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "jfr_parse", os.path.join("bench", "jfr_parse.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    try:
+        return mod.parse(path)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
 def threads_running():
     return status_var("Threads_running")
 
@@ -269,9 +358,9 @@ def reset_bucket_state(stock, buckets):
     gb.mysql(';'.join(statements) + ';')
 
 
-def run_once(consumers, requests, stock, buckets=0):
+def run_once(consumers, requests, stock, buckets=0, pool=None):
     log_path = f"bench/logs/app-c{consumers}-{datetime.now():%H%M%S}.log"
-    start_app(consumers, log_path)
+    start_app(consumers, log_path, pool=pool)
     pid = app_pid()
 
     # 冷 JIT 预热：每轮都重启了应用，热点方法还没被 C2 编译，直接测会让
@@ -306,6 +395,11 @@ def run_once(consumers, requests, stock, buckets=0):
     peak = {"ready": 0, "unacked": 0, "cpu": 0.0, "conns": 0,
             "busy_conns": 0, "threads_running": 0}
     stop = threading.Event()
+    # MySQL 容器 CPU/IO 是累计值，只取首尾快照相减，避免高频 docker exec 干扰测量。
+    mysql_cpu0 = mysql_container_cpu_usec()
+    io0 = mysql_container_io()
+    # 连接池等待用 JFR 记录（低开销、带调用栈），不用线程栈采样避免 safepoint 干扰。
+    jfr_name, jfr_path = jfr_start(pid, f"c{consumers}r{int(time.time()) % 100000}")
 
     def sampler():
         while not stop.is_set():
@@ -355,6 +449,10 @@ def run_once(consumers, requests, stock, buckets=0):
         time.sleep(2)
     stop.set()
     th.join(timeout=10)
+    jfr_stop(pid, jfr_name, jfr_path)
+    pool_wait = pool_wait_from_jfr(jfr_path)
+    mysql_cpu1 = mysql_container_cpu_usec()
+    io1 = mysql_container_io()
     drain_sec = max(last_change - drain_start, 0)
     orders = mysql_scalar("SELECT COUNT(*) FROM tb_voucher_order") - orders0
     # 纯消费者排空 TPS：只算注入结束后新增的落库量，剔除注入期已落库部分。
@@ -386,6 +484,14 @@ def run_once(consumers, requests, stock, buckets=0):
     max_tx_ms = round(after["tx"]["max_ns"] / 1e9, 1)
     rl_waits = delta(base["row_lock_waits"], after["row_lock_waits"])
     rl_time_ms = round(delta(base["row_lock_time_ms"], after["row_lock_time_ms"]), 1)
+
+    # MySQL 容器 CPU 与磁盘 IO：容器级计数，只统计本轮窗口内的增量。
+    mysql_cpu_ms = round((mysql_cpu1 - mysql_cpu0) / 1000, 1) if (
+        mysql_cpu0 is not None and mysql_cpu1 is not None) else None
+    io_read_mb = round((io1[0] - io0[0]) / 1048576, 2)
+    io_write_mb = round((io1[1] - io0[1]) / 1048576, 2)
+    io_read_ops = io1[2] - io0[2]
+    io_write_ops = io1[3] - io0[3]
 
     # 语句级拆解：定位「时间到底花在扣库存还是插入订单」
     stmt_stats = {}
@@ -454,6 +560,15 @@ def run_once(consumers, requests, stock, buckets=0):
         "db_conns_peak": peak["conns"],
         "db_busy_conns_peak": peak["busy_conns"],
         "mysql_threads_running_peak": peak["threads_running"],
+        "mysql_cpu_ms": mysql_cpu_ms,
+        "mysql_io_read_mb": io_read_mb,
+        "mysql_io_write_mb": io_write_mb,
+        "mysql_io_read_ops": io_read_ops,
+        "mysql_io_write_ops": io_write_ops,
+        "pool_size": pool,
+        "pool_borrow_n": pool_wait.get("borrow_n"),
+        "pool_borrow_ms": pool_wait.get("borrow_ms"),
+        "pool_borrow_max_ms": pool_wait.get("borrow_max_ms"),
         "row_lock_waits_delta": rl_waits,
         "row_lock_time_ms_delta": rl_time_ms,
         "stmt_stats": stmt_stats,
@@ -493,6 +608,9 @@ def main():
     ap.add_argument("--stock", type=int, default=None,
                     help="默认等于 requests，便于用库存归零做超卖校验")
     ap.add_argument("--out-dir", default="bench/results/consumer-matrix")
+    ap.add_argument("--pool", type=int, default=None,
+                    help="覆盖 Hikari maximum-pool-size；不传保持默认 10。"
+                         "只在确认消费者数受池限制后单独做对照时使用，禁止与消费者数同改")
     args = ap.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
@@ -502,42 +620,46 @@ def main():
     all_reports = []
     for c in groups:
         for rep in range(1, args.reps + 1):
-            print(f"\n=== 消费者={c} 第{rep}/{args.reps}次 请求={args.requests} 库存={stock} ===",
-                  flush=True)
-            r = run_once(c, args.requests, stock, args.buckets)
+            print(f"\n=== 消费者={c} 第{rep}/{args.reps}次 请求={args.requests} 库存={stock} "
+                  f"池={args.pool if args.pool else '默认10'} ===", flush=True)
+            r = run_once(c, args.requests, stock, args.buckets, pool=args.pool)
             r["rep"] = rep
             all_reports.append(r)
             print(json.dumps({k: r[k] for k in
-                              ("consumers", "rep", "inject_sec", "drain_sec",
+                              ("consumers", "rep", "pool_size", "inject_sec", "drain_sec",
                                "orders_persisted", "order_throughput_qps", "drain_tps",
                                "drained_orders", "drain_only_tps",
                                "mq_peak_ready", "row_lock_waits_delta", "tx_avg_ms",
                                "cpu_max_pct_all_cores", "db_conns_peak",
-                               "db_busy_conns_peak", "stmt_stats", "bucket_dist",
-                               "fallback", "check")},
+                               "db_busy_conns_peak", "pool_borrow_n", "pool_borrow_ms",
+                               "mysql_cpu_ms", "mysql_io_write_mb", "mysql_io_write_ops",
+                               "stmt_stats", "bucket_dist", "fallback", "check")},
                              ensure_ascii=False), flush=True)
 
     ts = datetime.now().strftime("%Y%m%dT%H%M%S")
     out = os.path.join(args.out_dir, f"consumer_matrix_{ts}.json")
     with open(out, "w", encoding="utf-8") as f:
         json.dump({"stock": stock, "requests": args.requests, "buckets": args.buckets,
-                   "reps": args.reps, "reports": all_reports}, f,
+                   "reps": args.reps, "pool": args.pool, "reports": all_reports}, f,
                   ensure_ascii=False, indent=2)
     print(f"\n[written] {out}")
 
     # 汇总
-    print(f"\n{'消费者':>6}{'次数':>6}{'注入s':>9}{'排空s':>9}{'落库单':>8}"
-          f"{'落库TPS':>10}{'排空TPS':>10}{'行锁等待':>10}{'事务均值ms':>12}"
-          f"{'CPU峰值%':>10}{'连接峰值':>10}")
+    print(f"\n{'消费者':>6}{'池':>5}{'次数':>6}{'注入s':>9}{'排空s':>9}{'落库单':>8}"
+          f"{'落库TPS':>10}{'排空TPS':>10}{'行锁等待':>10}{'池borrow':>9}"
+          f"{'池等待ms':>9}{'MySQLms':>9}{'写MB':>8}{'事务均值ms':>12}{'CPU峰值%':>10}{'连接峰值':>10}")
     for c in groups:
         rs = [r for r in all_reports if r["consumers"] == c]
         n = len(rs)
-        avg = lambda k: round(sum(r[k] for r in rs) / n, 2) if n else 0
-        print(f"{c:>6}{n:>6}{avg('inject_sec'):>9.2f}{avg('drain_sec'):>9.2f}"
+        avg = lambda k: round(sum(r[k] for r in rs if r.get(k) is not None) / n, 2) if n else 0
+        ps = args.pool if args.pool else 10
+        print(f"{c:>6}{ps:>5}{n:>6}{avg('inject_sec'):>9.2f}{avg('drain_sec'):>9.2f}"
               f"{avg('orders_persisted'):>8.0f}{avg('order_throughput_qps'):>10.2f}"
-              f"{avg('drain_tps'):>10.2f}{avg('row_lock_waits_delta'):>10.0f}"
-              f"{avg('tx_avg_ms'):>12.3f}{avg('cpu_max_pct_all_cores'):>10.2f}"
-              f"{avg('db_conns_peak'):>10.0f}")
+              f"{avg('drain_only_tps'):>10.2f}{avg('row_lock_waits_delta'):>10.0f}"
+              f"{avg('pool_borrow_n'):>9.0f}{avg('pool_borrow_ms'):>9.0f}"
+              f"{avg('mysql_cpu_ms'):>9.0f}"
+              f"{avg('mysql_io_write_mb'):>8.1f}{avg('tx_avg_ms'):>12.3f}"
+              f"{avg('cpu_max_pct_all_cores'):>10.2f}{avg('db_conns_peak'):>10.0f}")
 
     bad = [r for r in all_reports
            if not all(r["check"][k] for k in
