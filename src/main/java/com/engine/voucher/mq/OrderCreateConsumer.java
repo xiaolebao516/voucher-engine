@@ -61,7 +61,9 @@ public class OrderCreateConsumer {
         DUPLICATE_ORDER
     }
 
-    @RabbitListener(queues = RabbitMqConfig.ORDER_CREATE_QUEUE)
+    // 固定并发度，仅作用于下单队列；用于 1/2/4 消费者对照实验。
+    @RabbitListener(queues = RabbitMqConfig.ORDER_CREATE_QUEUE,
+            concurrency = "${seckill.order-consumer.concurrency:1}")
     public void handleOrderCreate(String msgJson, Message message, Channel channel) throws IOException {
         Object traceIdObj = message.getMessageProperties().getHeader(TraceConstant.TRACE_ID_HEADER);
         String traceId = traceIdObj != null ? traceIdObj.toString() : "NO_TRACE";

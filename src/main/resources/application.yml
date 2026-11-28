@@ -38,6 +38,9 @@ mybatis-plus:
 #    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 打印SQL，方便你观察缓存有没有穿透打到数据库
 
 seckill:
+  order-consumer:
+    # 固定消费者数，默认保持原单消费者基线；压测可覆盖为 2 或 4。
+    concurrency: 1
   rate-limit:
     # 压测开关：关闭后限流直接放行，用于「开启/关闭限流」两轮对照压测
     enabled: true
